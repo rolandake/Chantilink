@@ -1,0 +1,373 @@
+// backend/models/User.js - VERSION COMPLÈTE FINALE - CHANTILINK
+import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
+
+const userSchema = new mongoose.Schema(
+  {
+    // ========================
+    // 🔹 Nom affiché et email
+    // ========================
+    fullName: {
+      type: String,
+      required: [true, "Le nom complet est requis"],
+      trim: true,
+      minlength: [3, "Le nom doit contenir au moins 3 caractères"],
+      maxlength: [30, "Le nom ne peut pas dépasser 30 caractères"],
+    },
+    email: {
+      type: String,
+      required: [true, "L'email est requis"],
+      unique: true,
+      lowercase: true,
+      trim: true,
+      match: [/^\S+@\S+\.\S+$/, "Email invalide"],
+    },
+    password: {
+      type: String,
+      required: [true, "Le mot de passe est requis"],
+      minlength: [6, "Le mot de passe doit contenir au moins 6 caractères"],
+      select: false,
+    },
+
+    // ========================
+    // 📞 NUMÉRO DE TÉLÉPHONE
+    // ========================
+    phone: {
+      type: String,
+      unique: true,
+      sparse: true, // Permet que certains users n'aient pas de phone
+      trim: true,
+      match: [/^\+?[0-9]{10,15}$/, "Numéro de téléphone invalide"],
+    },
+
+    phoneVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    phoneVerificationCode: {
+      type: String,
+      select: false, // on ne le renvoie jamais au client
+    },
+
+    phoneVerificationExpires: {
+      type: Date,
+      select: false,
+    },
+
+    hasSeenPhoneModal: {
+      type: Boolean,
+      default: false,
+    },
+
+    // ========================
+    // 📇 CONTACTS SYNCHRONISÉS
+    // ========================
+    contacts: [{
+      name: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      phone: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      normalizedPhone: {
+        type: String,
+        required: true
+      },
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null
+      },
+      isOnChantilink: {
+        type: Boolean,
+        default: false
+      },
+      addedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    
+    lastContactSync: {
+      type: Date,
+      default: null
+    },
+
+    // ========================
+    // 💬 PARAMÈTRES DE CHAT
+    // ========================
+    chatSettings: {
+      allowContactsToMessage: { type: Boolean, default: true },
+      allowFriendsToMessage: { type: Boolean, default: true },
+      allowStoryReplyFromAnyone: { type: Boolean, default: false },
+      readReceipts: { type: Boolean, default: true },
+      showOnlineStatus: { type: Boolean, default: true },
+      allowVoiceMessages: { type: Boolean, default: true }
+    },
+
+    // ========================
+    // 🧍 Profil utilisateur
+    // ========================
+    bio: { type: String, maxlength: 300, trim: true, default: "" },
+    profilePhoto: { type: String, default: "/default-avatar.png" },
+    coverPhoto: { type: String, default: null },
+    location: { type: String, trim: true },
+    website: { type: String, trim: true },
+
+    // ========================
+    // 🔁 Relations sociales
+    // ========================
+    followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User", default: [] }],
+    following: [{ type: mongoose.Schema.Types.ObjectId, ref: "User", default: [] }],
+    friendRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: "User", default: [] }],
+    friends: [{ type: mongoose.Schema.Types.ObjectId, ref: "User", default: [] }],
+    blocked: [{ type: mongoose.Schema.Types.ObjectId, ref: "User", default: [] }],
+    isOnline: { type: Boolean, default: false },
+    lastSeen: { type: Date, default: Date.now },
+
+    // ========================
+    // 🔔 Notifications
+    // ========================
+    notifications: [
+      {
+        title: { type: String, required: true, maxlength: 100 },
+        message: { type: String, required: true, maxlength: 500 },
+        text: { type: String, maxlength: 500 }, // Pour compatibilité Header
+        read: { type: Boolean, default: false },
+        createdAt: { type: Date, default: Date.now },
+        type: { type: String, enum: ["admin", "system", "user"], default: "admin" }
+      }
+    ],
+
+    // ========================
+    // ⚙️ Statut & rôle
+    // ========================
+    role: {
+      type: String,
+      enum: ["user", "admin", "moderator"],
+      default: "user",
+    },
+    isVerified: { type: Boolean, default: false },
+    isBanned: { type: Boolean, default: false },
+    isPremium: { type: Boolean, default: false },
+
+    // ========================
+    // 🔒 Sécurité
+    // ========================
+    loginAttempts: { type: Number, default: 0 },
+    lockUntil: { type: Date },
+    lastLogin: { type: Date, default: Date.now },
+  },
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
+);
+
+// ========================
+// 🔐 Méthodes de sécurité
+// ========================
+
+userSchema.methods.comparePassword = async function (candidatePassword) {
+  return bcrypt.compare(candidatePassword, this.password);
+};
+
+userSchema.methods.isLocked = function () {
+  return !!(this.lockUntil && this.lockUntil > Date.now());
+};
+
+userSchema.methods.incLoginAttempts = function () {
+  const maxAttempts = 5;
+  const lockTime = 2 * 60 * 60 * 1000; // 2h
+  
+  if (this.lockUntil && this.lockUntil < Date.now()) {
+    return this.updateOne({ 
+      $set: { loginAttempts: 1 }, 
+      $unset: { lockUntil: 1 } 
+    });
+  }
+  
+  const updates = { $inc: { loginAttempts: 1 } };
+  
+  if (this.loginAttempts + 1 >= maxAttempts && !this.isLocked()) {
+    updates.$set = { lockUntil: Date.now() + lockTime };
+  }
+  
+  return this.updateOne(updates);
+};
+
+userSchema.methods.resetLoginAttempts = function () {
+  return this.updateOne({
+    $set: { loginAttempts: 0, lastLogin: Date.now() },
+    $unset: { lockUntil: 1 },
+  });
+};
+
+userSchema.methods.toPublicJSON = function () {
+  return {
+    id: this._id,
+    _id: this._id,
+    fullName: this.fullName,
+    email: this.email,
+    phone: this.phone,
+    hasSeenPhoneModal: this.hasSeenPhoneModal,
+    bio: this.bio,
+    profilePhoto: this.profilePhoto,
+    coverPhoto: this.coverPhoto,
+    location: this.location,
+    website: this.website,
+    followersCount: this.followers?.length || 0,
+    followingCount: this.following?.length || 0,
+    isVerified: this.isVerified,
+    isPremium: this.isPremium,
+    role: this.role,
+    createdAt: this.createdAt,
+    isOnline: this.isOnline,
+    lastSeen: this.lastSeen,
+    notifications: this.notifications || [],
+  };
+};
+
+// ========================
+// 📇 MÉTHODES CONTACTS
+// ========================
+
+/**
+ * Synchroniser les contacts depuis l'appareil
+ * @param {Array} contactsList - Liste des contacts [{name, phone}]
+ * @returns {Array} Liste des contacts synchronisés avec infos Chantilink
+ */
+userSchema.methods.syncContacts = async function (contactsList) {
+  const syncedContacts = [];
+  const thisUser = this;
+  
+  for (const contact of contactsList) {
+    // Normaliser le numéro (supprimer espaces, tirets, parenthèses)
+    const normalizedPhone = contact.phone
+      .replace(/[\s\-\(\)\.]/g, '')
+      .replace(/^00/, '+')
+      .replace(/^0/, '+225'); // Adapter selon votre pays par défaut
+    
+    // Chercher si ce numéro existe sur Chantilink
+    const foundUser = await mongoose.model('User').findOne({ 
+      phone: normalizedPhone 
+    }).select('_id fullName profilePhoto phone');
+    
+    syncedContacts.push({
+      name: contact.name,
+      phone: contact.phone,
+      normalizedPhone,
+      userId: foundUser?._id || null,
+      isOnChantilink: !!foundUser,
+      addedAt: new Date()
+    });
+
+    // Si l'utilisateur existe sur Chantilink, l'ajouter automatiquement dans ses contacts aussi
+    if (foundUser) {
+      await mongoose.model('User').updateOne(
+        { _id: foundUser._id },
+        { 
+          $addToSet: { 
+            contacts: {
+              name: thisUser.fullName,
+              phone: thisUser.phone,
+              normalizedPhone: thisUser.phone,
+              userId: thisUser._id,
+              isOnChantilink: true,
+              addedAt: new Date()
+            }
+          }
+        }
+      );
+    }
+  }
+  
+  this.contacts = syncedContacts;
+  this.lastContactSync = new Date();
+  
+  return syncedContacts;
+};
+
+/**
+ * Obtenir les contacts qui sont sur Chantilink
+ * @returns {Array} Liste des ObjectId des contacts sur Chantilink
+ */
+userSchema.methods.getContactsOnChantilink = function () {
+  return this.contacts
+    .filter(c => c.isOnChantilink && c.userId)
+    .map(c => c.userId);
+};
+
+/**
+ * Vérifier si un utilisateur est dans les contacts
+ * @param {ObjectId} userId - ID de l'utilisateur à vérifier
+ * @returns {Boolean}
+ */
+userSchema.methods.isContact = function (userId) {
+  return this.contacts.some(
+    c => c.userId && c.userId.toString() === userId.toString()
+  );
+};
+
+// ========================
+// 💬 MÉTHODES CHAT
+// ========================
+
+/**
+ * Vérifier si peut chatter avec un autre utilisateur
+ * @param {ObjectId} otherUserId - ID de l'utilisateur cible
+ * @returns {Object} {allowed, reason, type}
+ */
+userSchema.methods.canChatWith = async function (otherUserId) {
+  const otherUser = await mongoose.model('User').findById(otherUserId);
+  
+  if (!otherUser) {
+    return { allowed: false, reason: "user_not_found" };
+  }
+  
+  // 1. Vérifier si bloqué
+  if (otherUser.blocked.includes(this._id)) {
+    return { allowed: false, reason: "blocked_by_user" };
+  }
+  
+  if (this.blocked.includes(otherUserId)) {
+    return { allowed: false, reason: "you_blocked_user" };
+  }
+  
+  // 2. Vérifier si dans les contacts
+  if (this.isContact(otherUserId) && otherUser.chatSettings?.allowContactsToMessage) {
+    return { allowed: true, reason: "contact", type: "contact" };
+  }
+  
+  // 3. Vérifier si amis
+  if (this.friends.includes(otherUserId) && otherUser.chatSettings?.allowFriendsToMessage) {
+    return { allowed: true, reason: "friend", type: "friend" };
+  }
+  
+  // 4. Vérifier si paramètres ouverts
+  if (otherUser.chatSettings?.allowStoryReplyFromAnyone) {
+    return { allowed: true, reason: "open_settings", type: "open" };
+  }
+  
+  return { allowed: false, reason: "not_connected" };
+};
+
+// ========================
+// 📦 Index pour performance
+// ========================
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ phone: 1 }, { unique: true, sparse: true });
+userSchema.index({ fullName: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ createdAt: -1 });
+userSchema.index({ "contacts.normalizedPhone": 1 });
+userSchema.index({ "contacts.userId": 1 });
+
+const User = mongoose.model("User", userSchema);
+export default User;

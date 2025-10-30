@@ -1,0 +1,134 @@
+// backend/middleware/verifyTokenAdmin
+import jwt from "jsonwebtoken";
+import User from "../models/User.js";
+
+/**
+ * Middleware universel Admin pour HTTP + Socket.io
+ * Options de sécurité optimisées pour prod
+ */
+export function createAdminMiddleware({ forSocket = false } = {}) {
+  return async (reqOrSocket, resOrNext, next) => {
+    const isSocket = forSocket;
+    const req = isSocket ? reqOrSocket.handshake : reqOrSocket;
+    const res = isSocket ? {} : resOrNext;
+    const nextFn = isSocket ? resOrNext : next;
+
+    // 🔑 Récupération token (Bearer ou cookie)
+    let token = isSocket
+      ? req.auth?.token || req.query?.token || extractCookie(req.headers?.cookie, "token")
+      : req.headers.authorization?.startsWith("Bearer ")
+      ? req.headers.authorization.split(" ")[1]
+      : req.cookies?.token;
+
+    const refreshToken = isSocket ? null : req.cookies?.refreshToken;
+
+    if (!token) return handleError("Token manquant", 401);
+
+    if (!process.env.JWT_SECRET || (!isSocket && !process.env.REFRESH_SECRET))
+      return handleError("Clés JWT absentes", 500);
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET, { ignoreExpiration: false });
+      const stopped = await attachAdmin(reqOrSocket, decoded);
+      if (stopped) return nextFn();
+      nextFn();
+    } catch (err) {
+      // 🔄 Refresh token automatique pour HTTP si expiré
+      if (err.name === "TokenExpiredError" && refreshToken && !isSocket) {
+        try {
+          const payload = jwt.verify(refreshToken, process.env.REFRESH_SECRET);
+          const user = await User.findById(payload.id);
+          if (!user) throw new Error("Utilisateur introuvable");
+
+          if (user.role !== "admin") throw new Error("Accès admin requis");
+
+          const newToken = jwt.sign(
+            {
+              id: user._id.toString(),
+              email: user.email,
+              role: user.role,
+              isVerified: user.isVerified,
+              isPremium: user.isPremium,
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: "15m" }
+          );
+
+          res.cookie("token", newToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+            maxAge: 15 * 60 * 1000,
+          });
+
+          const stopped = await attachAdmin(reqOrSocket, user);
+          if (stopped) return;
+          return nextFn();
+        } catch {
+          clearCookies(res);
+          return handleError("Refresh token invalide. Reconnectez-vous.", 401);
+        }
+      }
+      clearCookies(res);
+      return handleError("Token invalide ou expiré", 401);
+    }
+
+    // =========================
+    // Helper pour vérifier Admin
+    // =========================
+    async function attachAdmin(reqOrSocket, decodedOrUser) {
+      const userObj = decodedOrUser._id
+        ? {
+            id: decodedOrUser._id.toString(),
+            email: decodedOrUser.email,
+            role: decodedOrUser.role,
+            isVerified: decodedOrUser.isVerified,
+            isPremium: decodedOrUser.isPremium,
+          }
+        : {
+            id: decodedOrUser.id,
+            email: decodedOrUser.email,
+            role: decodedOrUser.role,
+            isVerified: decodedOrUser.isVerified,
+            isPremium: decodedOrUser.isPremium,
+          };
+
+      if (userObj.role !== "admin") return handleError("Accès réservé aux admins", 403);
+
+      if (isSocket) {
+        reqOrSocket.data = reqOrSocket.data || {};
+        reqOrSocket.data.user = userObj;
+      } else {
+        reqOrSocket.user = userObj;
+      }
+
+      return false;
+    }
+
+    function handleError(message, code = 401) {
+      if (isSocket) {
+        const err = new Error(message);
+        err.code = code;
+        return nextFn(err);
+      }
+      return res.status(code).json({ message });
+    }
+
+    function clearCookies(res) {
+      if (!isSocket) {
+        res.clearCookie("token");
+        res.clearCookie("refreshToken");
+      }
+    }
+
+    function extractCookie(cookieString, name) {
+      if (!cookieString) return null;
+      const match = cookieString.match(new RegExp(`${name}=([^;]+)`));
+      return match ? match[1] : null;
+    }
+  };
+}
+
+// ✅ Middlewares prêts à l’emploi
+export const verifyTokenAdmin = createAdminMiddleware(); // HTTP
+export const verifySocketAdmin = createAdminMiddleware({ forSocket: true }); // WebSocket
