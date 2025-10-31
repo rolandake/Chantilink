@@ -1,0 +1,89 @@
+{"level":50,"time":1761414962527,"pid":5988,"hostname":"ABATE-hp","msg":"❌ ChatIA Socket error:"}
+{"level":50,"time":1761526985116,"pid":14136,"hostname":"ABATE-hp","msg":"❌ Connexion sans authentification détectée!"}
+{"level":50,"time":1761527056209,"pid":14136,"hostname":"ABATE-hp","msg":"❌ Connexion sans authentification détectée!"}
+{"level":50,"time":1761527166368,"pid":18056,"hostname":"ABATE-hp","msg":"❌ Connexion sans authentification détectée!"}
+{"level":50,"time":1761527246784,"pid":18056,"hostname":"ABATE-hp","msg":"❌ Connexion sans authentification détectée!"}
+{"level":50,"time":1761527247305,"pid":18056,"hostname":"ABATE-hp","msg":"❌ Connexion sans authentification détectée!"}
+{"level":50,"time":1761527482605,"pid":7656,"hostname":"ABATE-hp","msg":"❌ Connexion sans authentification détectée!"}
+{"level":50,"time":1761527483125,"pid":7656,"hostname":"ABATE-hp","msg":"❌ Connexion sans authentification détectée!"}
+{"level":50,"time":1761527659216,"pid":16748,"hostname":"ABATE-hp","msg":"❌ Connexion sans authentification détectée!"}
+{"level":50,"time":1761527659239,"pid":16748,"hostname":"ABATE-hp","msg":"❌ Connexion sans authentification détectée!"}
+{"level":50,"time":1761527820396,"pid":12812,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761527820418,"pid":12812,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761561663346,"pid":5504,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761609367277,"pid":18136,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761609367809,"pid":18136,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761609842324,"pid":16944,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761609842844,"pid":16944,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761610571332,"pid":3260,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761610571871,"pid":3260,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761611196455,"pid":1704,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761611606594,"pid":13072,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761611774895,"pid":13072,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761611912734,"pid":13736,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761611970091,"pid":13736,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761611970628,"pid":13736,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761612895024,"pid":10112,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761613533553,"pid":10112,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761613696792,"pid":10112,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761614112238,"pid":10112,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761616400153,"pid":10112,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761616762751,"pid":10112,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761644416264,"pid":10112,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761648061849,"pid":10112,"hostname":"ABATE-hp","msg":"❌ [Socket Auth] JWT invalide: invalid signature"}
+{"level":50,"time":1761648660140,"pid":10112,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761659479033,"pid":10112,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761670952449,"pid":10224,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761671194342,"pid":10224,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761671194858,"pid":10224,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761671779357,"pid":12732,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761671779877,"pid":12732,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761675345202,"pid":16848,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761675345717,"pid":16848,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761678048367,"pid":16848,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761678221237,"pid":8252,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761678377623,"pid":8252,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761678435874,"pid":8252,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761679066861,"pid":15992,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761679508096,"pid":15992,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761679656782,"pid":15992,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761688856636,"pid":13364,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761689744320,"pid":16972,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761690693473,"pid":100,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761691296569,"pid":100,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761691297082,"pid":100,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761693358989,"pid":7796,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761693719502,"pid":7796,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761694963362,"pid":7796,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761695042933,"pid":7796,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761695043463,"pid":7796,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761696860851,"pid":18340,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761697571597,"pid":18276,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761698258572,"pid":18276,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761700331498,"pid":17144,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761731378819,"pid":15176,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761734945237,"pid":15756,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761737384238,"pid":15756,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761737837985,"pid":15948,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761738390829,"pid":10284,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761738851363,"pid":7096,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761761071068,"pid":7096,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761761451748,"pid":7096,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761762158055,"pid":13236,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761762468341,"pid":8940,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761763348861,"pid":16616,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761763417782,"pid":16616,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761763499173,"pid":16616,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761764553762,"pid":15920,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761771211365,"pid":15920,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761773220120,"pid":15500,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761773267164,"pid":15500,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761777255990,"pid":8000,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761779498486,"pid":3996,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761823085778,"pid":2624,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761823864567,"pid":4864,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761824420546,"pid":13100,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761858471252,"pid":15132,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761859322360,"pid":15132,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761861116020,"pid":11620,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761861797441,"pid":7252,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
