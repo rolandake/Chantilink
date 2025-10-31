@@ -1,0 +1,253 @@
+/* src/pages/Home/StoryContainer.css - Version Optimisée */
+
+/* Conteneur principal des stories */
+.story-container {
+  display: flex;
+  gap: 16px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: #fb923c #f3f4f6;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Scrollbar Chrome/Edge */
+.story-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.story-container::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 3px;
+}
+
+.story-container::-webkit-scrollbar-thumb {
+  background: #fb923c;
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.story-container::-webkit-scrollbar-thumb:hover {
+  background: #f97316;
+}
+
+/* Item de story */
+.story-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.story-item:hover {
+  transform: scale(1.05);
+}
+
+.story-item:active {
+  transform: scale(0.95);
+}
+
+/* Cercle de la story */
+.story-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Gradient pour les stories non vues */
+.story-circle.unviewed {
+  background: linear-gradient(135deg, #ec4899 0%, #f97316 50%, #fbbf24 100%);
+  padding: 3px;
+}
+
+.story-circle.unviewed::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  background: white;
+  border-radius: 50%;
+  z-index: 1;
+}
+
+/* Stories vues */
+.story-circle.viewed {
+  background: #d1d5db;
+  padding: 3px;
+}
+
+/* Image dans le cercle */
+.story-slide-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  position: relative;
+  z-index: 2;
+}
+
+/* Mini photo de profil */
+.story-small-profile {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid white;
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  object-fit: cover;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+  background-color: white;
+}
+
+/* Indicateur nouvelle story */
+.new-indicator {
+  width: 14px;
+  height: 14px;
+  background-color: #ef4444;
+  border-radius: 50%;
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  border: 2px solid white;
+  z-index: 10;
+  animation: pulse-red 2s ease-in-out infinite;
+}
+
+@keyframes pulse-red {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+}
+
+/* Nom de l'utilisateur */
+.story-name {
+  margin-top: 8px;
+  font-size: 12px;
+  text-align: center;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* Badge "Vous" */
+.my-story-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: #3b82f6;
+  color: white;
+  font-size: 8px;
+  padding: 2px 6px;
+  border-radius: 0 0 8px 0;
+  font-weight: bold;
+  z-index: 10;
+}
+
+/* Temps restant */
+.time-remaining {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.time-remaining svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Nombre de slides */
+.slides-count {
+  font-size: 9px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+/* Animation de chargement */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: 200px 0;
+  }
+}
+
+.story-skeleton {
+  background: linear-gradient(90deg, #f3f4f6 0px, #e5e7eb 40px, #f3f4f6 80px);
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .story-container {
+    gap: 12px;
+    padding: 8px 12px;
+  }
+
+  .story-circle {
+    width: 70px;
+    height: 70px;
+  }
+
+  .story-name {
+    font-size: 11px;
+    max-width: 70px;
+  }
+
+  .story-small-profile {
+    width: 24px;
+    height: 24px;
+  }
+
+  .new-indicator {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+/* Accessibilité */
+.story-item:focus {
+  outline: 2px solid #f97316;
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+/* Smooth scrolling */
+@media (prefers-reduced-motion: no-preference) {
+  .story-container {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Désactiver animations si préférence */
+@media (prefers-reduced-motion: reduce) {
+  .story-item,
+  .new-indicator {
+    transition: none;
+    animation: none;
+  }
+}
