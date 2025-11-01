@@ -2,11 +2,11 @@
 import express from "express";
 import multer from "multer";
 import fs from "fs";
-import path from "path";
-import PlanModel from "../models/Plan.js"; // Schema mongoose pour plan
+import PlanModel from "../models/Plan.js";
+import { uploadFile } from "../utils/cloudinaryServer.js";
 
 const router = express.Router();
-const upload = multer({ dest: "uploads/" }); // dossier temporaire
+const upload = multer({ dest: "tmp/" }); // stockage temporaire
 
 router.post("/upload", upload.array("plans"), async (req, res) => {
   try {
@@ -14,17 +14,25 @@ router.post("/upload", upload.array("plans"), async (req, res) => {
     const plans = [];
 
     for (const file of req.files) {
-      const targetPath = path.join("uploads", file.originalname);
-      fs.renameSync(file.path, targetPath);
+      // Upload sur Cloudinary
+      const result = await cloudinary.uploader.upload(file.path, {
+        resource_type: "auto", // image, vidéo, PDF, etc.
+        folder: `plans/${userId}`, // organise par utilisateur
+      });
 
+      // Supprimer fichier temporaire
+      fs.unlinkSync(file.path);
+
+      // Sauvegarder en DB
       const newPlan = await PlanModel.create({
         userId,
         projectType,
         name: file.originalname,
-        path: targetPath,
+        path: result.secure_url, // URL Cloudinary
         type: file.mimetype,
         createdAt: new Date(),
       });
+
       plans.push(newPlan);
     }
 

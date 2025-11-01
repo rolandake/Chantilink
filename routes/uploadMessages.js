@@ -27,6 +27,8 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "Aucun fichier" });
 
     const folder = "messages"; // dossier Cloudinary
+
+    // Utilisation de ton utilitaire centralisé
     const result = await uploadFile(req.file.buffer, folder, req.file.originalname);
 
     res.json({
@@ -35,10 +37,11 @@ router.post("/", verifyToken, upload.single("file"), async (req, res) => {
       filename: req.file.originalname,
       mimetype: req.file.mimetype,
       size: req.file.size,
+      public_id: result.public_id,
     });
   } catch (err) {
     console.error("❌ Erreur upload Cloudinary:", err);
-    res.status(500).json({ error: "Erreur Cloudinary", details: err.message });
+    res.status(500).json({ error: "Erreur serveur lors de l'upload" });
   }
 });
 

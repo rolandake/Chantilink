@@ -1,40 +1,27 @@
-// backend/routes/postsRoutes.js
+// backend/routes/postsRoutes.js - VERSION CORRIGÉE
 import express from "express";
-import path from "path";
-import fs from "fs";
 import Post from "../models/Post.js";
 import User from "../models/User.js";
 import { verifyToken } from "../middleware/auth.js";
-import { uploadWithLimits, handleMulterError } from "../middleware/upload.js";
+import multer from "multer";
+import { uploadFile, deleteFile } from "../utils/cloudinaryServer.js";
 
 const router = express.Router();
 
+// --- Multer in-memory ---
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
+});
+
 // --- Helpers ---
-const getMediaUrl = (req, file) => {
-  return `${req.protocol}://${req.get("host")}/uploads/posts/${file.filename}`;
-};
-
-const deleteFile = (mediaUrl) => {
-  if (!mediaUrl) return;
-  try {
-    const filePath = path.join(process.cwd(), new URL(mediaUrl).pathname);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-      console.log("🗑️ Fichier supprimé:", filePath);
-    }
-  } catch (err) {
-    console.error("❌ Erreur suppression fichier:", err);
-  }
-};
-
-// Helper pour récupérer les infos complètes de l'utilisateur (avec certification)
 const getUserInfo = async (userId) => {
   try {
-    const user = await User.findById(userId).select('_id username fullName profilePhoto isVerified isPremium role');
-    if (!user) {
-      console.warn(`⚠️ Utilisateur ${userId} introuvable`);
-      return null;
-    }
+    const user = await User.findById(userId).select(
+      "_id username fullName profilePhoto isVerified isPremium role"
+    );
+    if (!user) return null;
     return {
       _id: user._id,
       username: user.username,
@@ -42,265 +29,404 @@ const getUserInfo = async (userId) => {
       profilePhoto: user.profilePhoto,
       isVerified: user.isVerified || false,
       isPremium: user.isPremium || false,
+      role: user.role || "user",
     };
   } catch (err) {
-    console.error("❌ Erreur getUserInfo:", err);
+    console.error("❌ getUserInfo error:", err);
     return null;
   }
 };
 
-// --- CRUD POSTS ---
-
-// CREATE POST
-router.post(
-  "/",
-  verifyToken,
-  uploadWithLimits,
-  handleMulterError,
-  async (req, res) => {
-    try {
-      const { content, location, privacy } = req.body;
-
-      if (!content?.trim() && (!req.files || req.files.length === 0)) {
-        return res.status(400).json({ error: "Le post est vide" });
-      }
-
-      const userInfo = await getUserInfo(req.user.id);
-      if (!userInfo) {
-        return res.status(404).json({ error: "Utilisateur non trouvé" });
-      }
-
-      const mediaUrls = req.files ? req.files.map(f => getMediaUrl(req, f)) : [];
-      const mediaType = req.files && req.files.length > 0
-        ? (req.files[0].mimetype.startsWith("video") ? "video" : "image")
-        : null;
-
-      const newPost = new Post({
-        user: userInfo,
-        content: content || "",
-        media: mediaUrls,
-        mediaType,
-        location,
-        privacy: privacy || "Public",
-        likes: [],
-        views: [],
-        comments: [],
-        shares: []
-      });
-
-      await newPost.save();
-      console.log("✅ Post créé:", newPost._id, "par", userInfo.fullName);
-      res.status(201).json(newPost);
-    } catch (err) {
-      console.error("❌ Erreur création post:", err);
-      
-      if (req.files) {
-        req.files.forEach(file => {
-          const filePath = path.join(process.cwd(), "uploads/posts", file.filename);
-          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        });
-      }
-      
-      res.status(500).json({ error: "Erreur serveur", details: err.message });
-    }
-  }
-);
-
-// UPDATE POST
-router.put(
-  "/:id",
-  verifyToken,
-  uploadWithLimits,
-  handleMulterError,
-  async (req, res) => {
-    try {
-      const { id } = req.params;
-      const post = await Post.findById(id);
-
-      if (!post) {
-        return res.status(404).json({ error: "Post non trouvé" });
-      }
-
-      if (post.user._id.toString() !== req.user.id && req.user.role !== "admin") {
-        return res.status(403).json({ error: "Non autorisé" });
-      }
-
-      const { content, location, privacy } = req.body;
-      if (content !== undefined) post.content = content;
-      if (location !== undefined) post.location = location;
-      if (privacy) post.privacy = privacy;
-
-      if (req.files && req.files.length > 0) {
-        if (post.media && post.media.length > 0) {
-          post.media.forEach(deleteFile);
-        }
-        post.media = req.files.map(f => getMediaUrl(req, f));
-        post.mediaType = req.files[0].mimetype.startsWith("video") ? "video" : "image";
-      }
-
-      await post.save();
-      console.log("✅ Post modifié:", post._id);
-      res.json({ message: "Post modifié", post });
-    } catch (err) {
-      console.error("❌ Erreur modification post:", err);
-      res.status(500).json({ error: "Erreur serveur", details: err.message });
-    }
-  }
-);
-
-// DELETE POST
-router.delete("/:id", verifyToken, async (req, res) => {
+// ============================================
+// CREATE POST - CORRIGÉ
+// ============================================
+router.post("/", verifyToken, upload.array("media"), async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id);
-
-    if (!post) {
-      return res.status(404).json({ error: "Post non trouvé" });
+    const { content, location, privacy } = req.body;
+    
+    // Validation
+    if (!content?.trim() && (!req.files || req.files.length === 0)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Post vide" 
+      });
     }
 
-    if (post.user._id.toString() !== req.user.id && req.user.role !== "admin") {
-      return res.status(403).json({ error: "Non autorisé" });
+    // Récupérer les infos utilisateur
+    const userInfo = await getUserInfo(req.user.id);
+    if (!userInfo) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Utilisateur introuvable" 
+      });
     }
 
-    if (post.media && post.media.length > 0) {
-      post.media.forEach(deleteFile);
+    // ✅ CORRECTION 1: Upload vers Cloudinary et extraire les URLs
+    const mediaUrls = [];
+    if (req.files?.length > 0) {
+      console.log(`📤 Upload de ${req.files.length} fichier(s) vers Cloudinary...`);
+      
+      for (const file of req.files) {
+        try {
+          // uploadFile retourne { secure_url, public_id, resource_type, ... }
+          const result = await uploadFile(
+            file.buffer, 
+            "posts", 
+            `${req.user.id}-${Date.now()}-${file.originalname}`
+          );
+          
+          console.log(`✅ Fichier uploadé:`, {
+            public_id: result.public_id,
+            secure_url: result.secure_url,
+            resource_type: result.resource_type
+          });
+          
+          // On stocke le public_id (pas l'URL complète) pour flexibilité
+          mediaUrls.push(result.public_id);
+        } catch (uploadErr) {
+          console.error("❌ Erreur upload Cloudinary:", uploadErr);
+          // On continue avec les autres fichiers
+        }
+      }
     }
 
-    await post.deleteOne();
-    console.log("✅ Post supprimé:", req.params.id);
-    res.json({ message: "Post supprimé" });
+    // Déterminer le type de média
+    const mediaType = req.files?.[0]?.mimetype.startsWith("video") ? "video" : "image";
+
+    // ✅ CORRECTION 2: Créer le post avec les public_ids Cloudinary
+    const newPost = new Post({
+      user: userInfo,
+      content: content || "",
+      media: mediaUrls, // Array de public_ids Cloudinary
+      mediaType,
+      location,
+      privacy: privacy || "Public",
+      likes: [],
+      views: [],
+      comments: [],
+      shares: [],
+    });
+
+    await newPost.save();
+
+    console.log("✅ Post créé avec succès:", {
+      _id: newPost._id,
+      mediaCount: mediaUrls.length,
+      media: mediaUrls
+    });
+
+    // ✅ CORRECTION 3: Retourner le format attendu par le frontend
+    res.status(201).json({ 
+      success: true, 
+      data: newPost.toObject() // Convertir en objet plain
+    });
+
   } catch (err) {
-    console.error("❌ Erreur suppression post:", err);
-    res.status(500).json({ error: "Erreur serveur", details: err.message });
+    console.error("❌ Erreur création post:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: "Erreur serveur", 
+      details: err.message 
+    });
   }
 });
 
-// GET ALL POSTS (avec pagination) - ✅ CORRIGÉ
+// ============================================
+// UPDATE POST - CORRIGÉ
+// ============================================
+router.put("/:id", verifyToken, upload.array("media"), async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Post introuvable" 
+      });
+    }
+
+    // Vérification des permissions
+    if (post.user._id.toString() !== req.user.id && req.user.role !== "admin") {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Non autorisé" 
+      });
+    }
+
+    const { content, location, privacy } = req.body;
+    
+    // Mise à jour des champs simples
+    if (content !== undefined) post.content = content;
+    if (location !== undefined) post.location = location;
+    if (privacy) post.privacy = privacy;
+
+    // ✅ Upload nouveaux médias si fournis
+    if (req.files?.length > 0) {
+      console.log(`📤 Upload de ${req.files.length} nouveau(x) média(s)...`);
+      
+      // Supprimer les anciens médias Cloudinary
+      if (post.media?.length > 0) {
+        for (const oldPublicId of post.media) {
+          try {
+            await deleteFile(oldPublicId, post.mediaType || "image");
+            console.log(`🗑️ Ancien média supprimé: ${oldPublicId}`);
+          } catch (delErr) {
+            console.warn("⚠️ Erreur suppression:", delErr);
+          }
+        }
+      }
+
+      // Upload nouveaux médias
+      const newMediaUrls = [];
+      for (const file of req.files) {
+        try {
+          const result = await uploadFile(
+            file.buffer, 
+            "posts", 
+            `${req.user.id}-${Date.now()}-${file.originalname}`
+          );
+          newMediaUrls.push(result.public_id);
+        } catch (uploadErr) {
+          console.error("❌ Erreur upload:", uploadErr);
+        }
+      }
+
+      post.media = newMediaUrls;
+      post.mediaType = req.files[0].mimetype.startsWith("video") ? "video" : "image";
+    }
+
+    await post.save();
+    
+    console.log("✅ Post modifié:", post._id);
+    res.json({ success: true, data: post.toObject() });
+
+  } catch (err) {
+    console.error("❌ Erreur modification post:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: "Erreur serveur", 
+      details: err.message 
+    });
+  }
+});
+
+// ============================================
+// DELETE POST - CORRIGÉ
+// ============================================
+router.delete("/:id", verifyToken, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Post introuvable" 
+      });
+    }
+
+    // Vérification des permissions
+    if (post.user._id.toString() !== req.user.id && req.user.role !== "admin") {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Non autorisé" 
+      });
+    }
+
+    // ✅ Supprimer les médias Cloudinary
+    if (post.media?.length > 0) {
+      console.log(`🗑️ Suppression de ${post.media.length} média(s) Cloudinary...`);
+      for (const publicId of post.media) {
+        try {
+          await deleteFile(publicId, post.mediaType || "image");
+          console.log(`✅ Média supprimé: ${publicId}`);
+        } catch (delErr) {
+          console.warn("⚠️ Erreur suppression Cloudinary:", delErr);
+        }
+      }
+    }
+
+    await post.deleteOne();
+    
+    console.log("✅ Post supprimé:", req.params.id);
+    res.json({ 
+      success: true, 
+      message: "Post supprimé",
+      deletedId: req.params.id
+    });
+
+  } catch (err) {
+    console.error("❌ Erreur suppression post:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: "Erreur serveur", 
+      details: err.message 
+    });
+  }
+});
+
+// ============================================
+// GET POSTS (all / by user) - CORRIGÉ
+// ============================================
 router.get("/", verifyToken, async (req, res) => {
   try {
     let { userId, page = 1, limit = 20 } = req.query;
     page = parseInt(page);
     limit = parseInt(limit);
 
-    // ✅ CORRECTION: Utiliser $or pour chercher soit dans user._id soit dans user
     let query = {};
-    if (userId) {
-      query = {
-        $or: [
-          { "user._id": userId },  // Si user est un objet
-          { user: userId }          // Si user est juste un ID
-        ]
-      };
-    }
+    if (userId) query = { "user._id": userId };
 
     const totalPosts = await Post.countDocuments(query);
     const posts = await Post.find(query)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
-      .limit(limit);
+      .limit(limit)
+      .lean(); // Convertir en objets plain
 
-    // Enrichir les posts avec les données utilisateur à jour (certification)
-    const enrichedPosts = await Promise.all(
-      posts.map(async (post) => {
-        try {
-          // Extraire l'ID utilisateur (qu'il soit objet ou string)
-          const userId = post.user?._id || post.user;
-          const userInfo = await getUserInfo(userId);
-          if (userInfo) {
-            post.user = userInfo;
-          }
-          return post;
-        } catch (err) {
-          console.warn("Erreur enrichissement post:", err);
-          return post;
-        }
-      })
-    );
+    // Enrichir les posts avec les infos utilisateur
+    const enrichedPosts = await Promise.all(posts.map(async (post) => {
+      const uid = post.user?._id || post.user;
+      const info = await getUserInfo(uid);
+      if (info) post.user = info;
+      return post;
+    }));
 
-    console.log(`✅ ${enrichedPosts.length} posts récupérés (page ${page}) ${userId ? `pour user ${userId}` : ''}`);
-    res.json({ posts: enrichedPosts, hasMore: page * limit < totalPosts });
+    console.log(`✅ ${enrichedPosts.length} posts récupérés (page ${page})`);
+    
+    // ✅ CORRECTION: Retourner le format attendu
+    res.json({ 
+      success: true, 
+      data: enrichedPosts, // TOUJOURS un tableau
+      posts: enrichedPosts, // Compatibilité frontend
+      hasMore: page * limit < totalPosts,
+      total: totalPosts,
+      page,
+      limit
+    });
+
   } catch (err) {
     console.error("❌ Erreur récupération posts:", err);
-    res.status(500).json({ error: "Erreur serveur", details: err.message });
+    res.status(500).json({ 
+      success: false, 
+      message: "Erreur serveur", 
+      details: err.message 
+    });
   }
 });
 
+// ============================================
 // GET POST BY ID
+// ============================================
 router.get("/:id", verifyToken, async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id);
+    const post = await Post.findById(req.params.id).lean();
     if (!post) {
-      return res.status(404).json({ error: "Post non trouvé" });
+      return res.status(404).json({ 
+        success: false, 
+        message: "Post introuvable" 
+      });
     }
 
-    // Enrichir avec données utilisateur à jour
-    const userId = post.user?._id || post.user;
-    const userInfo = await getUserInfo(userId);
-    if (userInfo) {
-      post.user = userInfo;
-    }
+    const uid = post.user?._id || post.user;
+    const info = await getUserInfo(uid);
+    if (info) post.user = info;
 
-    res.json(post);
+    res.json({ success: true, data: post });
   } catch (err) {
     console.error("❌ Erreur récupération post:", err);
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ 
+      success: false, 
+      message: "Erreur serveur", 
+      details: err.message 
+    });
   }
 });
 
-// --- INTERACTIONS ---
-
+// ============================================
 // LIKE POST
+// ============================================
 router.post("/:id/like", verifyToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
-    if (!post) return res.status(404).json({ error: "Post non trouvé" });
+    if (!post) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Post introuvable" 
+      });
+    }
 
     const userId = req.user.id;
-    const likeIndex = post.likes.findIndex(id => id.toString() === userId);
+    const liked = post.likes.some((id) => id.toString() === userId);
     
-    if (likeIndex > -1) {
-      post.likes.splice(likeIndex, 1);
+    if (liked) {
+      post.likes = post.likes.filter((id) => id.toString() !== userId);
     } else {
       post.likes.push(userId);
     }
 
     await post.save();
-    console.log(`✅ Like toggled sur post ${post._id} par user ${userId}`);
-    res.json(post);
+    
+    res.json({ 
+      success: true, 
+      data: post.toObject(),
+      likes: post.likes,
+      userLiked: !liked 
+    });
   } catch (err) {
     console.error("❌ Erreur like:", err);
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ 
+      success: false, 
+      message: "Erreur serveur" 
+    });
   }
 });
 
+// ============================================
 // COMMENT POST
+// ============================================
 router.post("/:id/comment", verifyToken, async (req, res) => {
   try {
     const { content } = req.body;
     if (!content?.trim()) {
-      return res.status(400).json({ error: "Commentaire vide" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Commentaire vide" 
+      });
     }
 
     const post = await Post.findById(req.params.id);
-    if (!post) return res.status(404).json({ error: "Post non trouvé" });
+    if (!post) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Post introuvable" 
+      });
+    }
 
     const userInfo = await getUserInfo(req.user.id);
     if (!userInfo) {
-      return res.status(404).json({ error: "Utilisateur non trouvé" });
+      return res.status(404).json({ 
+        success: false, 
+        message: "Utilisateur introuvable" 
+      });
     }
 
-    const newComment = {
-      content,
-      user: userInfo
+    const newComment = { 
+      content, 
+      user: userInfo, 
+      createdAt: new Date() 
     };
-
+    
     post.comments.push(newComment);
     await post.save();
-    
-    console.log(`✅ Commentaire ajouté sur post ${post._id}`);
-    res.json(post.comments[post.comments.length - 1]);
+
+    res.json({ 
+      success: true, 
+      data: newComment 
+    });
   } catch (err) {
     console.error("❌ Erreur commentaire:", err);
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ 
+      success: false, 
+      message: "Erreur serveur" 
+    });
   }
 });
 
@@ -308,57 +434,109 @@ router.post("/:id/comment", verifyToken, async (req, res) => {
 router.delete("/:id/comment/:commentId", verifyToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
-    if (!post) return res.status(404).json({ error: "Post non trouvé" });
+    if (!post) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Post introuvable" 
+      });
+    }
 
     const comment = post.comments.id(req.params.commentId);
-    if (!comment) return res.status(404).json({ error: "Commentaire non trouvé" });
+    if (!comment) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Commentaire introuvable" 
+      });
+    }
 
     if (comment.user._id.toString() !== req.user.id && req.user.role !== "admin") {
-      return res.status(403).json({ error: "Non autorisé" });
+      return res.status(403).json({ 
+        success: false, 
+        message: "Non autorisé" 
+      });
     }
 
     comment.deleteOne();
     await post.save();
-    res.json({ message: "Commentaire supprimé", comments: post.comments });
+    
+    res.json({ 
+      success: true, 
+      message: "Commentaire supprimé", 
+      data: post.comments 
+    });
   } catch (err) {
-    res.status(500).json({ error: "Erreur serveur" });
+    console.error("❌ Erreur suppression commentaire:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: "Erreur serveur" 
+    });
   }
 });
 
+// ============================================
 // VIEW POST
+// ============================================
 router.post("/:id/view", verifyToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
-    if (!post) return res.status(404).json({ error: "Post non trouvé" });
+    if (!post) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Post introuvable" 
+      });
+    }
 
     const userId = req.user.id;
-    if (!post.views.some(id => id.toString() === userId)) {
+    if (!post.views.includes(userId)) {
       post.views.push(userId);
       await post.save();
     }
 
-    res.json(post);
+    res.json({ 
+      success: true, 
+      data: { 
+        views: post.views.length, 
+        userViewed: post.views.includes(userId) 
+      } 
+    });
   } catch (err) {
-    res.status(500).json({ error: "Erreur serveur" });
+    console.error("❌ Erreur view:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: "Erreur serveur" 
+    });
   }
 });
 
+// ============================================
 // SHARE POST
+// ============================================
 router.post("/:id/share", verifyToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
-    if (!post) return res.status(404).json({ error: "Post non trouvé" });
+    if (!post) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Post introuvable" 
+      });
+    }
 
     const userId = req.user.id;
-    if (!post.shares) post.shares = [];
-    if (!post.shares.some(id => id.toString() === userId)) {
+    if (!post.shares.includes(userId)) {
       post.shares.push(userId);
       await post.save();
     }
 
-    res.json({ message: "Post partagé", shares: post.shares.length });
+    res.json({ 
+      success: true, 
+      data: { shares: post.shares.length } 
+    });
   } catch (err) {
-    res.status(500).json({ error: "Erreur serveur" });
+    console.error("❌ Erreur share:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: "Erreur serveur" 
+    });
   }
 });
 

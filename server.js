@@ -132,8 +132,6 @@ app.use(
   })
 );
 
-app.options("*", cors());
-
 // ========================================
 // PARSEURS JSON/URLENCODED
 // ========================================
@@ -500,7 +498,7 @@ logger.info("✅ Socket.IO configuré");
 // ========================================
 // 404 & ERROR HANDLERS
 // ========================================
-app.use("/api/*", (req, res) => {
+app.use(/^\/api\/.*/, (req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.originalUrl} non trouvée` });
 });
 

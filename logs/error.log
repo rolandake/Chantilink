@@ -87,3 +87,17 @@
 {"level":50,"time":1761859322360,"pid":15132,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
 {"level":50,"time":1761861116020,"pid":11620,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
 {"level":50,"time":1761861797441,"pid":7252,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761869670981,"pid":1248,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761906098116,"pid":10904,"hostname":"ABATE-hp","msg":"❌ Promesse rejetée non gérée:"}
+{"level":50,"time":1761906098556,"pid":10904,"hostname":"ABATE-hp","msg":"Erreur lors de l'envoi de notification Discord:"}
+{"level":50,"time":1761906156762,"pid":10904,"hostname":"ABATE-hp","msg":"❌ Promesse rejetée non gérée:"}
+{"level":50,"time":1761906157098,"pid":10904,"hostname":"ABATE-hp","msg":"Erreur lors de l'envoi de notification Discord:"}
+{"level":50,"time":1761906271609,"pid":10904,"hostname":"ABATE-hp","msg":"❌ Promesse rejetée non gérée:"}
+{"level":50,"time":1761906272017,"pid":10904,"hostname":"ABATE-hp","msg":"Erreur lors de l'envoi de notification Discord:"}
+{"level":50,"time":1761907506018,"pid":10904,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761907541679,"pid":10904,"hostname":"ABATE-hp","msg":"❌ Promesse rejetée non gérée:"}
+{"level":50,"time":1761907542041,"pid":10904,"hostname":"ABATE-hp","msg":"Erreur lors de l'envoi de notification Discord:"}
+{"level":50,"time":1761909634390,"pid":6688,"hostname":"ABATE-hp","msg":"❌ Erreur MongoDB :"}
+{"level":50,"time":1761909699748,"pid":18484,"hostname":"ABATE-hp","msg":"❌ Erreur MongoDB :"}
+{"level":50,"time":1761919679459,"pid":13624,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1761938928258,"pid":1452,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
