@@ -1,8 +1,8 @@
- import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { PlusIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { useStories } from "/src/context/StoryContext.jsx";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContext.jsx";
 import { useSocket } from "../../context/SocketContext.jsx";
 import "./StoryContainer.css";
 

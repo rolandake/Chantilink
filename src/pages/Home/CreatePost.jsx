@@ -11,11 +11,10 @@ import {
 } from "@heroicons/react/24/outline";
 
 // ============================================
-// 🎨 Avatar simple avec photo CORRIGÉ
+// 🎨 Avatar simple avec photo
 // ============================================
 const SimpleAvatar = ({ username, profilePhoto, size = 38 }) => {
   const [imageError, setImageError] = useState(false);
-  const base = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   const getInitials = (name) => {
     if (!name) return "?";
@@ -39,18 +38,18 @@ const SimpleAvatar = ({ username, profilePhoto, size = 38 }) => {
     return colors[Math.abs(hash) % colors.length];
   };
 
-  // ✅ Construction de l'URL complète de la photo
+  // ✅ Gestion des URLs Cloudinary
   const getPhotoUrl = (photo) => {
     if (!photo) return null;
-    // Si l'URL commence déjà par http, la retourner telle quelle
+    // Les URLs Cloudinary commencent déjà par http/https
     if (photo.startsWith('http')) return photo;
-    // Sinon, construire l'URL complète
+    // Fallback pour anciennes URLs locales
+    const base = import.meta.env.VITE_API_URL || "http://localhost:5000";
     return `${base}${photo.startsWith('/') ? photo : `/${photo}`}`;
   };
 
   const photoUrl = getPhotoUrl(profilePhoto);
 
-  // ✅ Afficher la photo si disponible ET pas d'erreur
   if (photoUrl && !imageError) {
     return (
       <img
@@ -62,12 +61,10 @@ const SimpleAvatar = ({ username, profilePhoto, size = 38 }) => {
           console.log('❌ Erreur chargement photo:', photoUrl);
           setImageError(true);
         }}
-        onLoad={() => console.log('✅ Photo chargée:', photoUrl)}
       />
     );
   }
 
-  // ✅ Sinon, afficher les initiales avec couleur
   return (
     <div
       className="rounded-full flex items-center justify-center text-white font-bold shadow-md ring-2 ring-orange-200"
@@ -260,7 +257,7 @@ export default function CreatePost({ user, showToast, onPostCreated }) {
   );
 
   // ==========================================
-  // 📤 Publication avec retry
+  // 📤 Publication avec Cloudinary
   // ==========================================
   const handlePost = async (retryCount = 0) => {
     if (posting) return;
@@ -286,16 +283,21 @@ export default function CreatePost({ user, showToast, onPostCreated }) {
     setUploadProgress(10);
 
     try {
-      // 📤 Préparation FormData
+      // 📤 Préparation FormData pour Cloudinary
       const formData = new FormData();
       formData.append("content", trimmedContent);
       if (location.trim()) formData.append("location", location.trim());
       formData.append("privacy", privacy);
-      mediaFiles.forEach((file) => formData.append("media", file));
+      
+      // ✅ Ajout des fichiers (Cloudinary les gère côté backend)
+      mediaFiles.forEach((file) => {
+        formData.append("media", file);
+      });
 
       setUploadProgress(30);
 
       // 🔹 Appel createPost du context
+      // Le backend s'occupe de l'upload vers Cloudinary
       const newPost = await createPost(formData);
 
       setUploadProgress(100);
@@ -304,6 +306,7 @@ export default function CreatePost({ user, showToast, onPostCreated }) {
       resetForm();
       showToast?.("Post publié avec succès ! 🎉", "success");
 
+      // ✅ Les URLs Cloudinary sont déjà dans newPost.media
       if (onPostCreated) onPostCreated({ ...newPost, user });
     } catch (err) {
       console.error("❌ Erreur publication:", err);

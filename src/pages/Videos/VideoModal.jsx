@@ -1,610 +1,931 @@
-// src/pages/videos/VideoCard.jsx - VERSION OPTIMISÉE
-import React, { useEffect, useRef, useState, useMemo, memo } from "react";
+// src/pages/videos/VideoModal.jsx - VERSION COMPLÈTE CORRIGÉE
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
-import { useVideos } from "../../context/VideoContext";
-import { 
-  FaHeart, 
-  FaRegHeart, 
-  FaComment, 
-  FaShare, 
-  FaBookmark,
-  FaRegBookmark,
+import {
+  FaTimes,
+  FaUpload,
   FaMusic,
-  FaVolumeUp,
-  FaVolumeMute,
+  FaPalette,
+  FaTextHeight,
+  FaCut,
+  FaCheck,
   FaPlay,
-  FaTrash,
-  FaFlag,
-  FaLink,
-  FaDownload,
-  FaUserSlash
+  FaPause,
+  FaCamera,
+  FaStop,
+  FaRedo,
+  FaArrowLeft,
+  FaGlobe,
+  FaUserFriends,
+  FaLock
 } from "react-icons/fa";
-import { HiDotsVertical } from "react-icons/hi";
-import { RiUserAddLine, RiUserFollowLine } from "react-icons/ri";
-import { IoSend } from "react-icons/io5";
+import { HiSparkles } from "react-icons/hi";
 
-const VideoCard = memo(({ video, isActive }) => {
+const VideoModal = ({ showModal, setShowModal }) => {
+  // Refs
   const videoRef = useRef(null);
-  const navigate = useNavigate();
-  
-  // ✅ Vérification de sécurité
-  if (!video) {
-    return (
-      <div className="relative w-full h-full flex justify-center items-center bg-black">
-        <p className="text-white text-lg">Vidéo non disponible</p>
-      </div>
-    );
-  }
-  
-  // ✅ Récupération depuis AuthContext avec getActiveUser()
-  const { getActiveUser } = useAuth();
-  const currentUser = getActiveUser();
-  const { likeVideo, commentVideo, deleteVideo } = useVideos();
+  const fileInputRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
+  const isCleaningRef = useRef(false);
+  const isMountedRef = useRef(true);
 
-  const [muted, setMuted] = useState(true);
-  const [showHeart, setShowHeart] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [progress, setProgress] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const [isLiked, setIsLiked] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [showComments, setShowComments] = useState(false);
-  const [showOptions, setShowOptions] = useState(false);
-  const [localLikes, setLocalLikes] = useState(video?.likes || 0);
-  const [localComments, setLocalComments] = useState(video?.comments || []);
-  const [newComment, setNewComment] = useState("");
+  // États principaux
+  const [step, setStep] = useState("upload");
+  const [videoFile, setVideoFile] = useState(null);
+  const [videoURL, setVideoURL] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-  const playAttemptRef = useRef(false);
-  const debugLoggedRef = useRef(false);
+  // Édition
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [selectedFilter, setSelectedFilter] = useState("none");
+  const [textOverlay, setTextOverlay] = useState("");
+  const [textColor, setTextColor] = useState("#ffffff");
+  const [textPosition] = useState({ x: 50, y: 10 });
+  const [musicName, setMusicName] = useState("");
+  const [startTime, setStartTime] = useState(0);
+  const [endTime, setEndTime] = useState(60);
+  const [duration, setDuration] = useState(0);
+  const [privacy, setPrivacy] = useState("public");
+  const [allowComments, setAllowComments] = useState(true);
+  const [allowDuet, setAllowDuet] = useState(true);
 
-  // ✅ OPTIMISATION CRITIQUE: Mémoriser les données du propriétaire
-  const videoOwnerData = useMemo(() => {
-    const owner = video?.uploadedBy || video?.owner || video?.user || {};
-    return {
-      id: owner?._id || owner?.id,
-      username: owner?.username || owner?.fullName || "Utilisateur",
-      avatar: owner?.profilePicture || owner?.profilePhoto || owner?.avatar || "/default-avatar.png",
-      verified: owner?.isVerified || false
-    };
-  }, [video?.uploadedBy, video?.owner, video?.user]);
+  // Loading
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  // ✅ OPTIMISATION: Mémoriser isOwner
-  const isOwner = useMemo(() => {
-    return currentUser?.user?._id === videoOwnerData.id || 
-           currentUser?.user?.id === videoOwnerData.id;
-  }, [currentUser?.user?._id, currentUser?.user?.id, videoOwnerData.id]);
+  const filters = [
+    { name: "Aucun", value: "none", filter: "none" },
+    { name: "Vintage", value: "vintage", filter: "sepia(0.5) contrast(1.2)" },
+    { name: "B&W", value: "bw", filter: "grayscale(1)" },
+    { name: "Vibrant", value: "vibrant", filter: "saturate(2) contrast(1.2)" },
+    { name: "Cool", value: "cool", filter: "hue-rotate(180deg)" },
+    { name: "Warm", value: "warm", filter: "hue-rotate(30deg) saturate(1.5)" },
+    { name: "Neon", value: "neon", filter: "contrast(1.5) brightness(1.2) saturate(2)" },
+    { name: "Dream", value: "dream", filter: "blur(1px) brightness(1.1) saturate(1.3)" },
+  ];
 
-  // ✅ OPTIMISATION: Log debug seulement UNE FOIS
-  useEffect(() => {
-    if (!debugLoggedRef.current && currentUser && video) {
-      console.log("🔍 [VideoCard] Données vidéo:", {
-        videoId: video._id,
-        ownerId: videoOwnerData.id,
-        ownerUsername: videoOwnerData.username,
-        isOwner
-      });
-      debugLoggedRef.current = true;
-    }
-  }, [video?._id]); // ✅ Dépend seulement de l'ID de la vidéo
+  // 🔧 CLEANUP AMÉLIORÉ
+  const cleanup = useCallback(() => {
+    if (isCleaningRef.current || !isMountedRef.current) return;
+    isCleaningRef.current = true;
 
-  // Gestion lecture automatique
-  useEffect(() => {
-    const vid = videoRef.current;
-    if (!vid) return;
+    console.log("🧹 Cleanup VideoModal démarré");
 
-    const playVideo = async () => {
+    // 1. Arrêter le stream
+    if (streamRef.current) {
       try {
-        if (vid.readyState < 2) {
-          await new Promise((resolve) => {
-            vid.addEventListener("loadeddata", resolve, { once: true });
-          });
-        }
+        streamRef.current.getTracks().forEach(track => track.stop());
+      } catch (e) {
+        console.warn("Erreur arrêt stream:", e);
+      }
+      streamRef.current = null;
+    }
 
-        if (video.startTime && !playAttemptRef.current) {
-          vid.currentTime = video.startTime;
-        }
+    // 2. Arrêter le recorder
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (e) {
+        console.warn("Erreur arrêt recorder:", e);
+      }
+      mediaRecorderRef.current = null;
+    }
 
-        await vid.play();
-        playAttemptRef.current = true;
-        setIsPaused(false);
-      } catch (err) {
-        if (err.name === "NotAllowedError") {
+    // 3. Nettoyer la vidéo avec requestAnimationFrame
+    if (videoRef.current && isMountedRef.current) {
+      requestAnimationFrame(() => {
+        const video = videoRef.current;
+        if (video && isMountedRef.current) {
           try {
-            setMuted(true);
-            vid.muted = true;
-            await vid.play();
-            playAttemptRef.current = true;
-            setIsPaused(false);
-          } catch (retryErr) {
-            setError("Impossible de lire la vidéo");
+            video.pause();
+            video.src = '';
+            video.srcObject = null;
+          } catch (e) {
+            console.warn("Erreur nettoyage vidéo:", e);
           }
         }
-      }
-    };
-
-    if (isActive) {
-      playVideo();
-    } else {
-      vid.pause();
-      setIsPaused(true);
-      playAttemptRef.current = false;
+      });
     }
 
-    return () => {
-      vid.pause();
-    };
-  }, [isActive, video.startTime]);
+    // 4. Révoquer l'URL après un délai
+    if (videoURL) {
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(videoURL);
+        } catch (e) {
+          console.warn("Erreur révocation URL:", e);
+        }
+      }, 100);
+    }
 
-  // Segment de lecture
+    // Reset des états
+    if (isMountedRef.current) {
+      setStep("upload");
+      setVideoFile(null);
+      setVideoURL(null);
+      setIsRecording(false);
+      setTitle("");
+      setDescription("");
+      setSelectedFilter("none");
+      setTextOverlay("");
+      setMusicName("");
+      setIsPlaying(false);
+      setStartTime(0);
+      setEndTime(60);
+      setDuration(0);
+      setRecordingTime(0);
+    }
+
+    setTimeout(() => {
+      isCleaningRef.current = false;
+    }, 200);
+  }, [videoURL]);
+
+  // Timer pour l'enregistrement
   useEffect(() => {
-    const vid = videoRef.current;
-    if (!vid || !video.endTime) return;
-
-    const handleTimeUpdate = () => {
-      const currentTime = vid.currentTime;
-      const duration = video.endTime - (video.startTime || 0);
-      setProgress((currentTime - (video.startTime || 0)) / duration * 100);
-
-      if (currentTime >= video.endTime) {
-        vid.currentTime = video.startTime || 0;
-      }
+    let interval;
+    if (isRecording) {
+      interval = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
     };
+  }, [isRecording]);
 
-    vid.addEventListener("timeupdate", handleTimeUpdate);
-    return () => vid.removeEventListener("timeupdate", handleTimeUpdate);
-  }, [video.startTime, video.endTime]);
-
-  // Double-tap like
-  const handleDoubleTap = () => {
-    if (!isLiked) {
-      handleLike();
+  // Nettoyage à la fermeture
+  useEffect(() => {
+    if (!showModal && isMountedRef.current) {
+      cleanup();
     }
-    setShowHeart(true);
-    setTimeout(() => setShowHeart(false), 1000);
-  };
+  }, [showModal, cleanup]);
 
-  const handleToggleMute = () => {
-    const vid = videoRef.current;
-    if (!vid) return;
-    const newMuted = !muted;
-    setMuted(newMuted);
-    vid.muted = newMuted;
-  };
+  // Nettoyage au démontage
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      cleanup();
+    };
+  }, [cleanup]);
 
-  const handlePlayPause = () => {
-    const vid = videoRef.current;
-    if (!vid) return;
-    
-    if (vid.paused) {
-      vid.play();
-      setIsPaused(false);
-    } else {
-      vid.pause();
-      setIsPaused(true);
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("video/")) {
+      alert("❌ Veuillez sélectionner un fichier vidéo");
+      return;
     }
-  };
 
-  const handleLike = async () => {
-    const wasLiked = isLiked;
-    setIsLiked(!isLiked);
-    setLocalLikes(prev => wasLiked ? prev - 1 : prev + 1);
-    
-    try {
-      if (likeVideo) {
-        await likeVideo(video._id);
-      }
-    } catch (err) {
-      console.error("Erreur like:", err);
-      setIsLiked(wasLiked);
-      setLocalLikes(prev => wasLiked ? prev + 1 : prev - 1);
+    if (file.size > 100 * 1024 * 1024) {
+      alert("❌ La vidéo ne doit pas dépasser 100MB");
+      return;
     }
-  };
 
-  const handleSave = () => {
-    setIsSaved(!isSaved);
-    const message = !isSaved ? "✅ Vidéo ajoutée aux favoris" : "❌ Vidéo retirée des favoris";
-    alert(message);
-    setShowOptions(false);
-  };
-
-  const handleFollow = () => {
-    setIsFollowing(!isFollowing);
-  };
-
-  const handleShare = async () => {
-    if (navigator.share) {
+    if (videoURL) {
       try {
-        await navigator.share({
-          title: video?.title || "Vidéo",
-          text: video?.description || "",
-          url: window.location.href,
+        URL.revokeObjectURL(videoURL);
+      } catch (e) {
+        console.warn("Erreur révocation:", e);
+      }
+    }
+
+    setVideoFile(file);
+    const url = URL.createObjectURL(file);
+    setVideoURL(url);
+    setStep("edit");
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: 1080, height: 1920 },
+        audio: true,
+      });
+
+      streamRef.current = stream;
+      
+      if (videoRef.current && isMountedRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: "video/webm;codecs=vp9",
+      });
+
+      mediaRecorderRef.current = mediaRecorder;
+      const chunks = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        if (!isMountedRef.current) return;
+
+        const blob = new Blob(chunks, { type: "video/webm" });
+        
+        if (videoURL) {
+          try {
+            URL.revokeObjectURL(videoURL);
+          } catch (e) {
+            console.warn("Erreur révocation:", e);
+          }
+        }
+
+        const url = URL.createObjectURL(blob);
+        setVideoURL(url);
+        setVideoFile(new File([blob], "recorded-video.webm", { type: "video/webm" }));
+        
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+        }
+
+        if (videoRef.current && isMountedRef.current) {
+          videoRef.current.srcObject = null;
+        }
+
+        setStep("edit");
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Erreur enregistrement:", err);
+      alert("❌ Impossible d'accéder à la caméra");
+      
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      try {
+        mediaRecorderRef.current.stop();
+        setIsRecording(false);
+      } catch (e) {
+        console.warn("Erreur arrêt enregistrement:", e);
+      }
+    }
+  };
+
+  const retakeVideo = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+
+    if (videoURL) {
+      try {
+        URL.revokeObjectURL(videoURL);
+      } catch (e) {
+        console.warn("Erreur révocation:", e);
+      }
+    }
+
+    if (videoRef.current && isMountedRef.current) {
+      requestAnimationFrame(() => {
+        const video = videoRef.current;
+        if (video && isMountedRef.current) {
+          try {
+            video.pause();
+            video.src = '';
+            video.srcObject = null;
+          } catch (e) {
+            console.warn("Erreur nettoyage vidéo:", e);
+          }
+        }
+      });
+    }
+
+    setVideoURL(null);
+    setVideoFile(null);
+    setIsPlaying(false);
+    setStep("upload");
+  };
+
+  const togglePlay = () => {
+    if (videoRef.current && isMountedRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play().catch(e => console.warn('Erreur lecture:', e));
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current && isMountedRef.current) {
+      const dur = videoRef.current.duration;
+      setDuration(dur);
+      setEndTime(Math.min(60, dur));
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!videoFile) {
+      alert("❌ Aucune vidéo sélectionnée");
+      return;
+    }
+
+    if (!title.trim()) {
+      alert("❌ Veuillez ajouter un titre");
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("video", videoFile);
+      formData.append("title", title);
+      formData.append("description", description);
+      formData.append("filter", selectedFilter);
+      formData.append("textOverlay", textOverlay);
+      formData.append("textColor", textColor);
+      formData.append("textPos", JSON.stringify(textPosition));
+      formData.append("musicName", musicName);
+      formData.append("startTime", startTime);
+      formData.append("endTime", endTime);
+      formData.append("privacy", privacy);
+      formData.append("allowComments", allowComments);
+      formData.append("allowDuet", allowDuet);
+
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + 10;
         });
-      } catch (err) {
-        console.log("Partage annulé");
-      }
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      alert("🔗 Lien copié !");
-    }
-  };
+      }, 200);
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    alert("🔗 Lien copié dans le presse-papier !");
-    setShowOptions(false);
-  };
+      // Simulation upload
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-  const handleDownload = async () => {
-    try {
-      const response = await fetch(video.url);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `video-${video._id}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-      alert("📥 Téléchargement lancé !");
-      setShowOptions(false);
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          alert("✅ Vidéo publiée avec succès !");
+          setShowModal(false);
+          cleanup();
+          setIsUploading(false);
+          setUploadProgress(0);
+        }
+      }, 500);
     } catch (err) {
-      console.error("Erreur téléchargement:", err);
-      alert("❌ Erreur lors du téléchargement");
-    }
-  };
-
-  const handleReport = () => {
-    alert("⚠️ Vidéo signalée. Notre équipe va examiner ce contenu.");
-    setShowOptions(false);
-  };
-
-  const handleBlock = () => {
-    if (window.confirm(`Bloquer @${videoOwnerData.username} ? Vous ne verrez plus leurs vidéos.`)) {
-      alert(`🚫 @${videoOwnerData.username} a été bloqué`);
-      setShowOptions(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!window.confirm("🗑️ Supprimer cette vidéo définitivement ?")) return;
-    
-    try {
-      if (deleteVideo) {
-        await deleteVideo(video._id);
-        alert("✅ Vidéo supprimée avec succès");
-        setShowOptions(false);
+      console.error("Erreur publication:", err);
+      alert("❌ Erreur lors de la publication");
+      if (isMountedRef.current) {
+        setIsUploading(false);
+        setUploadProgress(0);
       }
-    } catch (err) {
-      console.error("Erreur suppression:", err);
-      alert("❌ Erreur lors de la suppression");
     }
   };
 
-  const handleAddComment = async () => {
-    if (!newComment.trim()) return;
-    
-    const comment = {
-      id: Date.now(),
-      user: {
-        _id: currentUser?.user?._id,
-        username: currentUser?.user?.username || currentUser?.user?.fullName,
-        fullName: currentUser?.user?.fullName,
-        profilePicture: currentUser?.user?.profilePhoto || currentUser?.user?.profilePicture,
-        avatar: currentUser?.user?.profilePhoto || currentUser?.user?.avatar,
-        email: currentUser?.user?.email,
-        isVerified: currentUser?.user?.isVerified,
-      },
-      text: newComment,
-      createdAt: new Date(),
-    };
-    
-    setLocalComments([...localComments, comment]);
-    setNewComment("");
-    
-    try {
-      if (commentVideo) {
-        await commentVideo(video._id, newComment);
-      }
-    } catch (err) {
-      console.error("Erreur commentaire:", err);
-      setLocalComments(localComments);
-    }
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const formatNumber = (num) => {
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
-    if (num >= 1000) return (num / 1000).toFixed(1) + "K";
-    return num?.toString() || "0";
-  };
+  if (!showModal) return null;
 
   return (
-    <div className="relative w-full h-full flex justify-center items-center bg-black overflow-hidden">
-      {/* Loading */}
-      {isLoading && !error && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/50">
-          <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-        </div>
-      )}
-
-      {/* Vidéo */}
-      <video
-        ref={videoRef}
-        src={video.url}
-        className="w-full h-full object-cover"
-        style={{ filter: video.filter || "none" }}
-        loop
-        muted={muted}
-        playsInline
-        preload="metadata"
-        onDoubleClick={handleDoubleTap}
-        onClick={handlePlayPause}
-        onLoadedData={() => setIsLoading(false)}
-        onError={() => setError("Erreur de chargement")}
-      />
-
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 pointer-events-none" />
-
-      {/* Badge LIVE */}
-      {video.isLive && (
-        <div className="absolute top-6 left-4 z-30">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-gradient-to-r from-red-600 to-pink-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">
-              <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-              LIVE
-            </div>
-            <div className="bg-black/80 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full">
-              👁 {formatNumber(video.viewers || 0)}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Progress bar */}
-      {!video.isLive && (
-        <div className="absolute top-0 left-0 right-0 h-0.5 bg-white/10 z-30">
-          <div
-            className="h-full bg-gradient-to-r from-orange-500 to-pink-500 transition-all duration-100"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      )}
-
-      {/* Play/Pause overlay */}
-      {isPaused && (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key="modal-backdrop"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+        onClick={() => !isUploading && setShowModal(false)}
+      >
         <motion.div
-          initial={{ scale: 0, opacity: 0 }}
+          key="modal-content"
+          initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+          exit={{ scale: 0.9, opacity: 0 }}
+          onClick={(e) => e.stopPropagation()}
+          className="relative w-full max-w-4xl max-h-[95vh] bg-gradient-to-br from-gray-900 via-black to-gray-900 rounded-3xl shadow-2xl overflow-hidden"
         >
-          <div className="w-20 h-20 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center">
-            <FaPlay className="text-white text-3xl ml-1" />
+          {/* Header */}
+          <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-xl border-b border-white/10 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {step !== "upload" && (
+                  <button
+                    onClick={() => setStep(step === "publish" ? "edit" : "upload")}
+                    className="text-white/70 hover:text-white transition-colors"
+                  >
+                    <FaArrowLeft size={20} />
+                  </button>
+                )}
+                <h2 className="text-white text-xl font-bold flex items-center gap-2">
+                  <HiSparkles className="text-pink-500" />
+                  <span>
+                    {step === "upload" && "Créer une vidéo"}
+                    {step === "edit" && "Modifier la vidéo"}
+                    {step === "publish" && "Publier"}
+                  </span>
+                </h2>
+              </div>
+              <button
+                onClick={() => !isUploading && setShowModal(false)}
+                disabled={isUploading}
+                className="text-white/70 hover:text-white transition-colors disabled:opacity-50"
+              >
+                <FaTimes size={24} />
+              </button>
+            </div>
           </div>
-        </motion.div>
-      )}
 
-      {/* Overlay texte */}
-      {video.textOverlay && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute text-3xl font-black pointer-events-none z-20"
-          style={{
-            color: video.textColor || "#ffffff",
-            left: `${video.textPos?.x || 50}%`,
-            top: `${video.textPos?.y || 10}%`,
-            transform: "translate(-50%, -50%)",
-            textShadow: "0 0 20px rgba(0,0,0,0.8), 2px 2px 8px rgba(0,0,0,0.6)",
-            letterSpacing: "0.05em",
-          }}
-        >
-          {video.textOverlay}
-        </motion.div>
-      )}
+          {/* Content */}
+          <div className="overflow-y-auto max-h-[calc(95vh-80px)] p-6">
+            {/* STEP 1: UPLOAD/RECORD */}
+            {step === "upload" && (
+              <div className="space-y-6">
+                <div className="text-center mb-8">
+                  <p className="text-white/70">Choisissez comment créer votre vidéo</p>
+                </div>
 
-      {/* Animation cœur double-tap */}
-      <AnimatePresence>
-        {showHeart && (
-          <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: [0, 1.5, 1.3], opacity: [0, 1, 0] }}
-            exit={{ scale: 0, opacity: 0 }}
-            transition={{ duration: 0.8 }}
-            className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
-          >
-            <FaHeart className="text-red-500 drop-shadow-2xl" style={{ fontSize: "8rem" }} />
-          </motion.div>
-        )}
-      </AnimatePresence>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="relative overflow-hidden bg-gradient-to-br from-pink-500/20 to-purple-600/20 border-2 border-pink-500/30 rounded-2xl p-8 cursor-pointer group hover:border-pink-500 transition-all"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-br from-pink-500/0 to-purple-600/0 group-hover:from-pink-500/10 group-hover:to-purple-600/10 transition-all" />
+                    <div className="relative flex flex-col items-center gap-4">
+                      <div className="w-20 h-20 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center">
+                        <FaUpload className="text-white text-2xl" />
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-white font-bold text-lg mb-2">
+                          Importer une vidéo
+                        </h3>
+                        <p className="text-white/60 text-sm">
+                          Sélectionnez un fichier depuis votre appareil
+                        </p>
+                        <p className="text-white/40 text-xs mt-2">
+                          Max 100MB • MP4, WebM, MOV
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
 
-      {/* Actions latérales (droite) */}
-      <div className="absolute right-4 bottom-32 flex flex-col items-center gap-6 z-40">
-        {/* Avatar + Follow */}
-        <div className="relative">
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            className="relative"
-          >
-            <img
-              src={videoOwnerData.avatar}
-              alt={videoOwnerData.username}
-              className="w-14 h-14 rounded-full object-cover border-2 border-white cursor-pointer shadow-lg"
-              onClick={() => videoOwnerData.id && navigate(`/profile/${videoOwnerData.id}`)}
-            />
-            {videoOwnerData.verified && (
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center border-2 border-black">
-                <span className="text-white text-xs">✓</span>
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={startRecording}
+                    className="relative overflow-hidden bg-gradient-to-br from-blue-500/20 to-cyan-600/20 border-2 border-blue-500/30 rounded-2xl p-8 cursor-pointer group hover:border-blue-500 transition-all"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-cyan-600/0 group-hover:from-blue-500/10 group-hover:to-cyan-600/10 transition-all" />
+                    <div className="relative flex flex-col items-center gap-4">
+                      <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-full flex items-center justify-center">
+                        <FaCamera className="text-white text-2xl" />
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-white font-bold text-lg mb-2">
+                          Enregistrer
+                        </h3>
+                        <p className="text-white/60 text-sm">
+                          Filmez directement avec votre caméra
+                        </p>
+                        <p className="text-white/40 text-xs mt-2">
+                          Max 60 secondes
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+
+                {isRecording && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-6 bg-black/50 backdrop-blur-xl rounded-2xl p-6 border border-red-500/50"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                        <span className="text-white font-semibold">
+                          Enregistrement en cours
+                        </span>
+                      </div>
+                      <span className="text-white font-mono text-xl">
+                        {formatTime(recordingTime)}
+                      </span>
+                    </div>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      muted
+                      playsInline
+                      className="w-full aspect-video bg-black rounded-xl mb-4"
+                    />
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={stopRecording}
+                      className="w-full py-4 bg-gradient-to-r from-red-500 to-pink-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:from-red-600 hover:to-pink-700 transition-all"
+                    >
+                      <FaStop /> Arrêter l'enregistrement
+                    </motion.button>
+                  </motion.div>
+                )}
               </div>
             )}
-          </motion.div>
-          
-          {!isOwner && (
-            <motion.button
-              onClick={handleFollow}
-              whileTap={{ scale: 0.9 }}
-              className={`absolute -bottom-2 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full flex items-center justify-center shadow-lg transition-all ${
-                isFollowing 
-                  ? "bg-gray-400" 
-                  : "bg-gradient-to-br from-red-500 to-pink-600"
-              }`}
-            >
-              {isFollowing ? (
-                <RiUserFollowLine className="text-white text-sm" />
-              ) : (
-                <RiUserAddLine className="text-white text-sm" />
-              )}
-            </motion.button>
-          )}
-        </div>
 
-        {/* Like */}
-        <motion.button
-          onClick={handleLike}
-          whileTap={{ scale: 0.9 }}
-          className="flex flex-col items-center gap-1"
-        >
-          <motion.div
-            animate={isLiked ? { scale: [1, 1.3, 1] } : {}}
-            transition={{ duration: 0.3 }}
-            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-              isLiked 
-                ? "bg-gradient-to-br from-red-500 to-pink-600" 
-                : "bg-black/60 backdrop-blur-md"
-            }`}
-          >
-            {isLiked ? (
-              <FaHeart className="text-white text-xl" />
-            ) : (
-              <FaRegHeart className="text-white text-xl" />
+            {/* STEP 2: EDIT */}
+            {step === "edit" && videoURL && (
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="relative bg-black rounded-2xl overflow-hidden aspect-[9/16]">
+                    <video
+                      ref={videoRef}
+                      src={videoURL}
+                      className="w-full h-full object-cover"
+                      style={{ filter: filters.find(f => f.value === selectedFilter)?.filter }}
+                      onLoadedMetadata={handleLoadedMetadata}
+                      loop
+                    />
+                    
+                    {textOverlay && (
+                      <div
+                        className="absolute text-2xl font-black pointer-events-none"
+                        style={{
+                          color: textColor,
+                          left: `${textPosition.x}%`,
+                          top: `${textPosition.y}%`,
+                          transform: "translate(-50%, -50%)",
+                          textShadow: "0 0 20px rgba(0,0,0,0.8), 2px 2px 8px rgba(0,0,0,0.6)",
+                        }}
+                      >
+                        {textOverlay}
+                      </div>
+                    )}
+
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-3">
+                      <motion.button
+                        whileTap={{ scale: 0.9 }}
+                        onClick={togglePlay}
+                        className="w-12 h-12 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center text-white"
+                      >
+                        {isPlaying ? <FaPause /> : <FaPlay />}
+                      </motion.button>
+                      <motion.button
+                        whileTap={{ scale: 0.9 }}
+                        onClick={retakeVideo}
+                        className="w-12 h-12 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center text-white"
+                      >
+                        <FaRedo />
+                      </motion.button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="bg-white/5 rounded-xl p-4">
+                    <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                      <FaPalette className="text-pink-500" /> Filtres
+                    </h3>
+                    <div className="grid grid-cols-4 gap-2">
+                      {filters.map((filter) => (
+                        <motion.button
+                          key={filter.value}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setSelectedFilter(filter.value)}
+                          className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                            selectedFilter === filter.value
+                              ? "border-pink-500"
+                              : "border-white/10"
+                          }`}
+                        >
+                          <div
+                            className="w-full h-full bg-gradient-to-br from-pink-500 to-purple-600"
+                            style={{ filter: filter.filter }}
+                          />
+                          <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-white text-[10px] font-semibold drop-shadow-lg whitespace-nowrap">
+                            {filter.name}
+                          </span>
+                          {selectedFilter === filter.value && (
+                            <div className="absolute top-1 right-1 w-4 h-4 bg-pink-500 rounded-full flex items-center justify-center">
+                              <FaCheck className="text-white text-[8px]" />
+                            </div>
+                          )}
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-white/5 rounded-xl p-4">
+                    <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                      <FaTextHeight className="text-blue-500" /> Texte
+                    </h3>
+                    <input
+                      type="text"
+                      value={textOverlay}
+                      onChange={(e) => setTextOverlay(e.target.value)}
+                      placeholder="Ajouter du texte..."
+                      className="w-full bg-white/10 text-white placeholder-white/50 rounded-lg px-4 py-2 mb-2 outline-none focus:ring-2 focus:ring-blue-500"
+                      maxLength={50}
+                    />
+                    <input
+                      type="color"
+                      value={textColor}
+                      onChange={(e) => setTextColor(e.target.value)}
+                      className="w-full h-10 rounded-lg cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="bg-white/5 rounded-xl p-4">
+                    <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                      <FaMusic className="text-purple-500" /> Musique
+                    </h3>
+                    <input
+                      type="text"
+                      value={musicName}
+                      onChange={(e) => setMusicName(e.target.value)}
+                      placeholder="Nom de la musique..."
+                      className="w-full bg-white/10 text-white placeholder-white/50 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+
+                  <div className="bg-white/5 rounded-xl p-4">
+                    <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                      <FaCut className="text-orange-500" /> Découpage
+                    </h3>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-white/70 text-sm mb-1 block">
+                          Début: {formatTime(startTime)}
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max={duration}
+                          step="0.1"
+                          value={startTime}
+                          onChange={(e) => setStartTime(parseFloat(e.target.value))}
+                          className="w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-white/70 text-sm mb-1 block">
+                          Fin: {formatTime(endTime)}
+                        </label>
+                        <input
+                          type="range"
+                          min={startTime}
+                          max={duration}
+                          step="0.1"
+                          value={endTime}
+                          onChange={(e) => setEndTime(parseFloat(e.target.value))}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setStep("publish")}
+                    className="w-full py-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold rounded-xl hover:from-pink-600 hover:to-purple-700 transition-all"
+                  >
+                    Suivant
+                  </motion.button>
+                </div>
+              </div>
             )}
-          </motion.div>
-          <span className="text-white text-xs font-bold drop-shadow-lg">
-            {formatNumber(localLikes)}
-          </span>
-        </motion.button>
 
-        {/* Comment */}
-        <motion.button
-          onClick={() => setShowComments(!showComments)}
-          whileTap={{ scale: 0.9 }}
-          className="flex flex-col items-center gap-1"
-        >
-          <div className="w-12 h-12 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center">
-            <FaComment className="text-white text-xl" />
+            {/* STEP 3: PUBLISH */}
+            {step === "publish" && (
+              <div className="max-w-2xl mx-auto space-y-6">
+                <div className="bg-white/5 rounded-xl p-6 space-y-4">
+                  <div>
+                    <label className="text-white font-semibold mb-2 block">
+                      Titre *
+                    </label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Donnez un titre accrocheur..."
+                      className="w-full bg-white/10 text-white placeholder-white/50 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-pink-500"
+                      maxLength={100}
+                    />
+                    <p className="text-white/40 text-xs mt-1">{title.length}/100</p>
+                  </div>
+
+                  <div>
+                    <label className="text-white font-semibold mb-2 block">
+                      Description
+                    </label>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Décrivez votre vidéo..."
+                      className="w-full bg-white/10 text-white placeholder-white/50 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-pink-500 resize-none"
+                      rows={4}
+                      maxLength={500}
+                    />
+                    <p className="text-white/40 text-xs mt-1">{description.length}/500</p>
+                  </div>
+
+                  <div>
+                    <label className="text-white font-semibold mb-3 block">
+                      Confidentialité
+                    </label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { value: "public", icon: FaGlobe, label: "Public", desc: "Tout le monde" },
+                        { value: "friends", icon: FaUserFriends, label: "Amis", desc: "Vos amis" },
+                        { value: "private", icon: FaLock, label: "Privé", desc: "Vous seul" },
+                      ].map((option) => {
+                        const IconComponent = option.icon;
+                        return (
+                          <motion.button
+                            key={option.value}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setPrivacy(option.value)}
+                            className={`p-4 rounded-xl border-2 transition-all ${
+                              privacy === option.value
+                                ? "border-pink-500 bg-pink-500/20"
+                                : "border-white/10 bg-white/5 hover:border-white/20"
+                            }`}
+                          >
+                            <IconComponent className={`text-2xl mx-auto mb-2 ${
+                              privacy === option.value ? "text-pink-500" : "text-white/70"
+                            }`} />
+                            <p className="text-white text-sm font-semibold">{option.label}</p>
+                            <p className="text-white/40 text-xs">{option.desc}</p>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="flex items-center justify-between bg-white/5 rounded-lg p-4 cursor-pointer">
+                      <span className="text-white font-medium">Autoriser les commentaires</span>
+                      <input
+                        type="checkbox"
+                        checked={allowComments}
+                        onChange={(e) => setAllowComments(e.target.checked)}
+                        className="w-5 h-5 accent-pink-500"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between bg-white/5 rounded-lg p-4 cursor-pointer">
+                      <span className="text-white font-medium">Autoriser les duos</span>
+                      <input
+                        type="checkbox"
+                        checked={allowDuet}
+                        onChange={(e) => setAllowDuet(e.target.checked)}
+                        className="w-5 h-5 accent-pink-500"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Prévisualisation miniature */}
+                <div className="bg-white/5 rounded-xl p-4">
+                  <h3 className="text-white font-semibold mb-3">Aperçu</h3>
+                  <div className="flex gap-4">
+                    <div className="relative w-24 h-32 bg-black rounded-lg overflow-hidden flex-shrink-0">
+                      <video
+                        src={videoURL}
+                        className="w-full h-full object-cover"
+                        style={{ filter: filters.find(f => f.value === selectedFilter)?.filter }}
+                      />
+                      {textOverlay && (
+                        <div
+                          className="absolute text-xs font-black"
+                          style={{
+                            color: textColor,
+                            left: `${textPosition.x}%`,
+                            top: `${textPosition.y}%`,
+                            transform: "translate(-50%, -50%)",
+                            textShadow: "0 0 10px rgba(0,0,0,0.8)",
+                          }}
+                        >
+                          {textOverlay}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <h4 className="text-white font-semibold line-clamp-2">{title || "Sans titre"}</h4>
+                      <p className="text-white/60 text-sm line-clamp-2">{description || "Aucune description"}</p>
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        {selectedFilter !== "none" && (
+                          <span className="bg-pink-500/20 text-pink-400 px-2 py-1 rounded">
+                            {filters.find(f => f.value === selectedFilter)?.name}
+                          </span>
+                        )}
+                        {musicName && (
+                          <span className="bg-purple-500/20 text-purple-400 px-2 py-1 rounded flex items-center gap-1">
+                            <FaMusic className="text-xs" /> {musicName}
+                          </span>
+                        )}
+                        {privacy === "public" && (
+                          <span className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded flex items-center gap-1">
+                            <FaGlobe className="text-xs" /> Public
+                          </span>
+                        )}
+                        {privacy === "friends" && (
+                          <span className="bg-green-500/20 text-green-400 px-2 py-1 rounded flex items-center gap-1">
+                            <FaUserFriends className="text-xs" /> Amis
+                          </span>
+                        )}
+                        {privacy === "private" && (
+                          <span className="bg-gray-500/20 text-gray-400 px-2 py-1 rounded flex items-center gap-1">
+                            <FaLock className="text-xs" /> Privé
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Conseils */}
+                <div className="bg-gradient-to-r from-pink-500/10 to-purple-600/10 border border-pink-500/30 rounded-xl p-4">
+                  <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+                    <HiSparkles className="text-pink-500" /> Conseils pour réussir
+                  </h3>
+                  <ul className="text-white/70 text-sm space-y-1">
+                    <li>✨ Utilisez un titre accrocheur et des hashtags pertinents</li>
+                    <li>🎨 Les filtres et effets augmentent l'engagement</li>
+                    <li>🎵 La musique populaire aide à la découverte</li>
+                    <li>⏱️ Les vidéos de 15-30 secondes ont plus de vues</li>
+                  </ul>
+                </div>
+
+                {/* Bouton Publier */}
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handlePublish}
+                  disabled={isUploading || !title.trim()}
+                  className={`w-full py-5 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all ${
+                    isUploading || !title.trim()
+                      ? "bg-gray-600 cursor-not-allowed"
+                      : "bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
+                  } text-white`}
+                >
+                  {isUploading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Publication en cours... {uploadProgress}%</span>
+                    </>
+                  ) : (
+                    <>
+                      <HiSparkles />
+                      <span>Publier maintenant</span>
+                    </>
+                  )}
+                </motion.button>
+
+                {/* Barre de progression */}
+                {isUploading && (
+                  <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${uploadProgress}%` }}
+                      className="h-full bg-gradient-to-r from-pink-500 to-purple-600"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <span className="text-white text-xs font-bold drop-shadow-lg">
-            {formatNumber(localComments.length)}
-          </span>
-        </motion.button>
-
-        {/* Share */}
-        <motion.button
-          onClick={handleShare}
-          whileTap={{ scale: 0.9 }}
-          className="flex flex-col items-center gap-1"
-        >
-          <div className="w-12 h-12 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center">
-            <FaShare className="text-white text-xl" />
-          </div>
-        </motion.button>
-
-        {/* Bouton son */}
-        <motion.button
-          onClick={handleToggleMute}
-          whileTap={{ scale: 0.9 }}
-          className="flex flex-col items-center gap-1"
-        >
-          <div className="w-12 h-12 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center">
-            {muted ? <FaVolumeMute className="text-white" size={20} /> : <FaVolumeUp className="text-white" size={20} />}
-          </div>
-        </motion.button>
-
-        {/* Bouton menu options */}
-        <motion.button
-          onClick={() => setShowOptions(!showOptions)}
-          whileTap={{ scale: 0.9 }}
-          className="flex flex-col items-center gap-1"
-        >
-          <div className="w-12 h-12 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center">
-            <HiDotsVertical className="text-white" size={20} />
-          </div>
-        </motion.button>
-
-        {/* Audio/Music icon */}
-        {video.musicName && (
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-            className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center shadow-lg"
-          >
-            <FaMusic className="text-white text-sm" />
-          </motion.div>
-        )}
-      </div>
-
-      {/* Infos vidéo (bas gauche) */}
-      <div className="absolute bottom-20 left-4 right-24 text-white z-40 space-y-2">
-        {/* User info */}
-        <div className="flex items-center gap-2">
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            onClick={() => videoOwnerData.id && navigate(`/profile/${videoOwnerData.id}`)}
-            className="cursor-pointer"
-          >
-            <p className="font-bold text-base drop-shadow-lg hover:underline">
-              @{videoOwnerData.username}
-            </p>
-          </motion.div>
-          {videoOwnerData.verified && (
-            <span className="text-blue-400 text-sm">✓</span>
-          )}
-        </div>
-
-        {/* Title */}
-        {video.title && (
-          <p className="font-semibold text-sm drop-shadow-lg line-clamp-1">
-            {video.title}
-          </p>
-        )}
-
-        {/* Description */}
-        {video.description && (
-          <p className="text-sm opacity-90 drop-shadow-lg line-clamp-2">
-            {video.description}
-          </p>
-        )}
-
-        {/* Music */}
-        {video.musicName && (
-          <div className="flex items-center gap-2 mt-2 bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-full inline-flex">
-            <FaMusic className="text-xs" />
-            <span className="text-xs font-medium truncate max-w-[200px]">
-              {video.musicName}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Panel commentaires - RESTE DU CODE IDENTIQUE */}
-      {/* ... */}
-      
-      {/* Modal Options - RESTE DU CODE IDENTIQUE */}
-      {/* ... */}
-    </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
-}, (prevProps, nextProps) => {
-  // ✅ OPTIMISATION CRITIQUE: Comparaison personnalisée pour éviter re-renders inutiles
-  return (
-    prevProps.video?._id === nextProps.video?._id &&
-    prevProps.isActive === nextProps.isActive
-  );
-});
+};
 
-VideoCard.displayName = 'VideoCard';
-
-export default VideoCard;
+export default VideoModal;

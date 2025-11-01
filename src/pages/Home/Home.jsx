@@ -1,4 +1,3 @@
- // src/Home/Home.jsx - Version optimisée finale
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { AnimatePresence, motion } from "framer-motion";
@@ -57,20 +56,13 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
   const toastTimerRef = useRef();
   const initialLoadRef = useRef(false);
 
-  // 🔍 Debug log
-  console.log('🏠 Home render:', { isStoryMode, openStory: !!openStory, showCreator });
-
-  // 🎯 Notifier App.jsx du changement de mode
   useEffect(() => {
     const isInStoryMode = !!(openStory || showCreator);
-    console.log('📢 Story mode change:', { isInStoryMode, openStory: !!openStory, showCreator });
-    
     if (onStoryModeChange) {
       onStoryModeChange(isInStoryMode, { openStory, showCreator });
     }
   }, [openStory, showCreator, onStoryModeChange]);
 
-  // Chargement initial
   useEffect(() => {
     const loadInitialPosts = async () => {
       if (initialLoadRef.current) return;
@@ -90,7 +82,6 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
     loadInitialPosts();
   }, [currentUser, token, allPosts.length]);
 
-  // Gestion erreurs
   useEffect(() => {
     if (postsError && allPosts.length === 0 && !loading && !initialLoading) {
       setToast({ 
@@ -100,7 +91,6 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
     }
   }, [postsError, allPosts.length, loading, initialLoading]);
 
-  // Toast auto-close avec animation
   useEffect(() => {
     if (toast) {
       setToastVisible(true);
@@ -116,7 +106,6 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
     };
   }, [toast]);
 
-  // Filtrage posts
   const filteredPosts = useMemo(() => {
     if (!Array.isArray(allPosts) || allPosts.length === 0) return [];
     
@@ -141,7 +130,6 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
     });
   }, [allPosts, searchQuery]);
 
-  // Infinite scroll
   const handleObserver = useCallback(
     (entries) => {
       const target = entries[0];
@@ -171,7 +159,6 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
     };
   }, [handleObserver]);
 
-  // Parallax scroll optimisé
   useEffect(() => {
     let ticking = false;
 
@@ -191,7 +178,6 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
 
   const storyTranslateY = Math.min(scrollY * 0.15, 15);
 
-  // Search handlers
   const handleSearchChange = (value) => {
     setSearchQuery(value);
     
@@ -258,6 +244,10 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
     }
   };
 
+  const showToast = useCallback((message, type = "info") => {
+    setToast({ message, type });
+  }, []);
+
   if (initialLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-orange-100 via-white to-orange-50/60 flex items-center justify-center">
@@ -273,7 +263,6 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
     );
   }
 
-  // 🎯 SI MODE STORY FULLSCREEN, AFFICHER UNIQUEMENT LES STORIES
   if (isStoryMode && (openStory || showCreator)) {
     return (
       <>
@@ -309,18 +298,14 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
         className={`min-h-screen bg-gradient-to-b from-orange-100 via-white to-orange-50/60 p-4 space-y-6 relative transition-all duration-300 ${
           (showCreator || openStory) ? 'blur-sm scale-95 pointer-events-none' : ''
         }`}
-        style={{
-          filter: (showCreator || openStory) ? 'blur(8px)' : 'none',
-          transform: (showCreator || openStory) ? 'scale(0.95)' : 'scale(1)',
-        }}
       >
-        {/* Barre de recherche sticky */}
+        {/* Barre de recherche */}
         <motion.div 
           className="sticky top-2 z-30 max-w-3xl mx-auto"
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
         >
-          <div className="w-full flex items-center gap-2 bg-white/80 backdrop-blur-md p-2 rounded-3xl shadow-lg border border-orange-200/50 transition-all">
+          <div className="w-full flex items-center gap-2 bg-white/80 backdrop-blur-md p-2 rounded-3xl shadow-lg border border-orange-200/50">
             <div className="relative flex-1">
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-orange-400" />
               <input
@@ -337,22 +322,10 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
                 </div>
               )}
             </div>
-            {!searchQuery && (
-              <motion.button
-                onClick={handleSearch}
-                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-2xl shadow-md hover:shadow-xl transition flex items-center gap-2"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <MagnifyingGlassIcon className="w-4 h-4" />
-                <span className="hidden sm:inline">Rechercher</span>
-              </motion.button>
-            )}
             {searchQuery && (
               <motion.button
                 onClick={clearSearch}
                 className="px-3 py-2 text-gray-500 hover:text-orange-500 hover:bg-orange-50 rounded-full transition"
-                aria-label="Effacer"
                 whileHover={{ scale: 1.1, rotate: 90 }}
                 whileTap={{ scale: 0.9 }}
               >
@@ -360,34 +333,13 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
               </motion.button>
             )}
           </div>
-          <AnimatePresence>
-            {searchQuery && !isSearching && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="mt-2 text-center text-sm text-gray-600"
-              >
-                {filteredPosts.length > 0 ? (
-                  <span>
-                    📊 <strong>{filteredPosts.length}</strong> résultat(s) pour "{searchQuery}"
-                  </span>
-                ) : (
-                  <span className="text-orange-500">Aucun résultat trouvé</span>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
         </motion.div>
 
-        {/* Stories avec parallax */}
+        {/* Stories */}
         {!searchQuery && (
           <motion.div
-            className="relative max-w-3xl mx-auto mt-4 z-20 transition-transform duration-300 ease-out"
+            className="relative max-w-3xl mx-auto mt-4 z-20"
             style={{ transform: `translateY(${storyTranslateY}px)` }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
           >
             <StoryContainer
               onOpenStory={handleOpenStory}
@@ -406,9 +358,9 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ delay: index * 0.05, duration: 0.3 }}
+                  transition={{ delay: index * 0.05 }}
                 >
-                  <PostCard post={post} />
+                  <PostCard post={post} showToast={showToast} />
                 </motion.div>
               ))
             ) : (
@@ -420,9 +372,6 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
                 >
                   <div className="text-6xl mb-4">📭</div>
                   <p className="text-gray-500 text-lg font-medium">Aucun post disponible</p>
-                  <p className="text-gray-400 text-sm mt-2">
-                    {searchQuery ? "Essayez une autre recherche" : "Soyez le premier à publier !"}
-                  </p>
                 </motion.div>
               )
             )}
@@ -443,7 +392,7 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
         </div>
       </div>
 
-      {/* Modals avec AnimatePresence */}
+      {/* Modals */}
       <AnimatePresence mode="wait">
         {showCreator && (
           <StoryCreator 
@@ -467,7 +416,7 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
         )}
       </AnimatePresence>
 
-      {/* Toast optimisé */}
+      {/* Toast */}
       <AnimatePresence>
         {toast && (
           <motion.div
@@ -475,7 +424,6 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
             initial={{ x: 400, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 400, opacity: 0 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className="fixed top-20 right-4 z-[10000]"
           >
             <div className={`px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[300px] backdrop-blur-md border ${
@@ -485,26 +433,16 @@ export default function Home({ onStoryModeChange, isStoryMode = false, initialSt
                 ? "bg-red-500 text-white border-red-400"
                 : "bg-blue-500 text-white border-blue-400"
             }`}>
-              <motion.span 
-                className="text-2xl"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.1, type: "spring", stiffness: 500 }}
-              >
+              <span className="text-2xl">
                 {toast.type === "success" ? "✅" : toast.type === "error" ? "❌" : "ℹ️"}
-              </motion.span>
+              </span>
               <p className="flex-1 font-medium">{toast.message}</p>
-              <motion.button 
-                onClick={() => {
-                  setToastVisible(false);
-                  setTimeout(() => setToast(null), 300);
-                }} 
-                className="text-white/80 hover:text-white transition"
-                whileHover={{ scale: 1.1, rotate: 90 }}
-                whileTap={{ scale: 0.9 }}
+              <button 
+                onClick={() => setToast(null)} 
+                className="text-white/80 hover:text-white"
               >
                 ✕
-              </motion.button>
+              </button>
             </div>
           </motion.div>
         )}

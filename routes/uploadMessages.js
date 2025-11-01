@@ -1,33 +1,19 @@
+// backend/routes/uploadMessages.js
 import express from "express";
 import multer from "multer";
-import path from "path";
-import fs from "fs/promises";
+import { uploadFile } from "../utils/cloudinaryServer.js";
 import { verifyToken } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// Storage pour messages
-const messageStorage = multer.diskStorage({
-  destination: async (req, file, cb) => {
-    const dir = path.join(process.cwd(), "uploads/messages");
-    await fs.mkdir(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const userId = req.user?.id || "anonymous";
-    const timestamp = Date.now();
-    const random = Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, `${userId}-${timestamp}-${random}${ext}`);
-  },
-});
-
+// --- Multer en mémoire ---
+const storage = multer.memoryStorage();
 const upload = multer({
-  storage: messageStorage,
+  storage,
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
   fileFilter: (req, file, cb) => {
     const allowed = /jpeg|jpg|png|gif|webp|mp4|webm|mp3|wav|ogg|pdf/;
-    if (allowed.test(file.mimetype) || allowed.test(path.extname(file.originalname).toLowerCase())) {
+    if (allowed.test(file.mimetype) || allowed.test(file.originalname.toLowerCase())) {
       cb(null, true);
     } else {
       cb(new Error("Type de fichier non autorisé"), false);
@@ -35,26 +21,24 @@ const upload = multer({
   },
 });
 
-// Upload un fichier
+// --- Upload sur Cloudinary ---
 router.post("/", verifyToken, upload.single("file"), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: "Aucun fichier" });
-    }
+    if (!req.file) return res.status(400).json({ error: "Aucun fichier" });
 
-    const fileUrl = `/uploads/messages/${req.file.filename}`;
+    const folder = "messages"; // dossier Cloudinary
+    const result = await uploadFile(req.file.buffer, folder, req.file.originalname);
 
     res.json({
       success: true,
-      fileUrl,
-      filename: req.file.filename,
-      originalName: req.file.originalname,
+      fileUrl: result.secure_url,
+      filename: req.file.originalname,
       mimetype: req.file.mimetype,
       size: req.file.size,
     });
-  } catch (error) {
-    console.error("❌ Erreur upload message:", error);
-    res.status(500).json({ error: "Erreur upload" });
+  } catch (err) {
+    console.error("❌ Erreur upload Cloudinary:", err);
+    res.status(500).json({ error: "Erreur Cloudinary", details: err.message });
   }
 });
 

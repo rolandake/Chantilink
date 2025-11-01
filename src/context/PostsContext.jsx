@@ -1,4 +1,4 @@
-// src/context/PostsContext.jsx - VERSION COMPLÈTE AVEC SYNCHRONISATION CACHE
+// src/context/PostsContext.jsx - VERSION CORRIGÉE
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "./AuthContext";
 import { useToast } from "./ToastContext";
@@ -51,19 +51,29 @@ export const PostsProvider = ({ children }) => {
         throw new Error(`Erreur ${res.status}: ${errorText}`);
       }
 
-      const data = await res.json();
-      const postsArray = Array.isArray(data.posts) ? data.posts : data;
+      const responseData = await res.json();
+      console.log("📦 Réponse API posts:", responseData);
+
+      // ✅ CORRECTION: Gérer plusieurs formats de réponse
+      let postsArray = [];
+      if (responseData.data && Array.isArray(responseData.data)) {
+        postsArray = responseData.data;
+      } else if (responseData.posts && Array.isArray(responseData.posts)) {
+        postsArray = responseData.posts;
+      } else if (Array.isArray(responseData)) {
+        postsArray = responseData;
+      }
+
       const normalized = postsArray.map(normalizePost);
 
       setPosts(prev => {
         const merged = append ? [...prev, ...normalized] : normalized;
         const unique = merged.filter((p, i, self) => i === self.findIndex(x => x._id === p._id));
-        // Sauvegarder dans le cache global
         idbSetPosts("allPosts", unique);
         return unique;
       });
 
-      const hasMorePosts = data.hasMore !== false && normalized.length === 20;
+      const hasMorePosts = responseData.hasMore !== false && normalized.length === 20;
       setHasMore(hasMorePosts);
       setPage(pageNumber);
 
@@ -100,8 +110,18 @@ export const PostsProvider = ({ children }) => {
 
       if (!res.ok) throw new Error(`Erreur ${res.status}`);
 
-      const data = await res.json();
-      const postsArray = Array.isArray(data.posts) ? data.posts : data;
+      const responseData = await res.json();
+      
+      // ✅ Gérer plusieurs formats de réponse
+      let postsArray = [];
+      if (responseData.data && Array.isArray(responseData.data)) {
+        postsArray = responseData.data;
+      } else if (responseData.posts && Array.isArray(responseData.posts)) {
+        postsArray = responseData.posts;
+      } else if (Array.isArray(responseData)) {
+        postsArray = responseData;
+      }
+
       const normalized = postsArray.map(normalizePost);
 
       // ✅ Synchroniser dans tous les caches
@@ -136,7 +156,7 @@ export const PostsProvider = ({ children }) => {
     }
   }, [token]);
 
-  // ✅ Create Post avec synchronisation
+  // ✅ Create Post avec synchronisation - CORRIGÉ
   const createPost = useCallback(async (formData) => {
     if (!token) {
       addToast("Vous devez être connecté", "error");
@@ -152,11 +172,26 @@ export const PostsProvider = ({ children }) => {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `Erreur ${res.status}`);
+        throw new Error(errorData.message || errorData.error || `Erreur ${res.status}`);
       }
 
-      const newPost = await res.json();
+      const responseData = await res.json();
+      console.log("✅ Réponse création post:", responseData);
+
+      // ✅ CORRECTION: Extraire le post correctement
+      let newPost = null;
+      if (responseData.data) {
+        newPost = responseData.data;
+      } else if (responseData._id) {
+        newPost = responseData;
+      }
+
+      if (!newPost || !newPost._id) {
+        throw new Error("Réponse invalide du serveur");
+      }
+
       const normalized = normalizePost(newPost);
+      console.log("✅ Post normalisé:", normalized);
 
       // ✅ Synchroniser dans tous les caches
       const userId = user?._id || user?.id;
@@ -251,8 +286,9 @@ export const PostsProvider = ({ children }) => {
 
       if (!res.ok) throw new Error("Erreur like");
 
-      const updatedData = await res.json();
-      const normalized = normalizePost(updatedData);
+      const responseData = await res.json();
+      const updatedPost = responseData.data || responseData;
+      const normalized = normalizePost(updatedPost);
       
       // ✅ Synchroniser
       const userId = typeof normalized.user === 'object' ? normalized.user._id : normalized.user;
@@ -286,7 +322,9 @@ export const PostsProvider = ({ children }) => {
       });
 
       if (!res.ok) throw new Error("Erreur commentaire");
-      const newComment = await res.json();
+      
+      const responseData = await res.json();
+      const newComment = responseData.data || responseData;
 
       setPosts(prev => {
         const updated = prev.map(p => {
@@ -310,7 +348,7 @@ export const PostsProvider = ({ children }) => {
     }
   }, [token, addToast]);
 
-  // ✅ Initial load (CORRIGÉ)
+  // ✅ Initial load
   useEffect(() => {
     const loadInitialPosts = async () => {
       if (!token || initialLoadDone.current) return;

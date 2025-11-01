@@ -95,10 +95,18 @@ function ProfileBasicsInner({ isOwner, user: propUser, showToast }) {
         website: editData.website.trim(),
       };
 
+      // ✅ Récupérer le token depuis localStorage
+      const token = localStorage.getItem('token');
+
       const { data } = await axios.put(
         `${API_URL}/api/users/${propUser._id}`,
         updateData,
-        { withCredentials: true }
+        { 
+          withCredentials: true,
+          headers: {
+            'Authorization': `Bearer ${token}` // ✅ Ajouter le token
+          }
+        }
       );
 
       console.log("✅ Profil mis à jour:", data);
@@ -236,9 +244,9 @@ function ProfileBasicsInner({ isOwner, user: propUser, showToast }) {
               disabled={saving}
             />
             <div className="mt-2 flex flex-wrap gap-2">
-              {EMOJIS.map((emoji) => (
+              {EMOJIS.map((emoji, index) => (
                 <button
-                  key={emoji}
+                  key={`emoji-${index}`}
                   type="button"
                   onClick={() => addEmoji(emoji)}
                   disabled={saving}

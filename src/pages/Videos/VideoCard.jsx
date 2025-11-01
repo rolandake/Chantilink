@@ -1,5 +1,5 @@
-// src/pages/videos/VideoCard.jsx - COMPLET AVEC AUTH CONTEXT
-import React, { useEffect, useRef, useState } from "react";
+// src/pages/videos/VideoCard.jsx - VERSION COMPLÈTE CORRIGÉE
+import React, { useEffect, useRef, useState, useMemo, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -15,6 +15,7 @@ import {
   FaVolumeUp,
   FaVolumeMute,
   FaPlay,
+  FaPause,
   FaTrash,
   FaFlag,
   FaLink,
@@ -25,11 +26,40 @@ import { HiDotsVertical } from "react-icons/hi";
 import { RiUserAddLine, RiUserFollowLine } from "react-icons/ri";
 import { IoSend } from "react-icons/io5";
 
-const VideoCard = ({ video, isActive }) => {
+// ✅ Fonction pour générer un avatar par défaut
+const generateDefaultAvatar = (username = "User") => {
+  const initial = username.charAt(0).toUpperCase();
+  const colors = ['9CA3AF', 'EF4444', '3B82F6', '10B981', 'F59E0B', '8B5CF6', 'EC4899'];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+  
+  return `data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100' height='100' fill='%23${color}'/%3E%3Ctext x='50%25' y='50%25' font-size='48' fill='white' text-anchor='middle' dominant-baseline='middle'%3E${initial}%3C/text%3E%3C/svg%3E`;
+};
+
+// ✅ Fonction corrigée pour obtenir l'URL de l'avatar
+const getAvatarUrl = (user) => {
+  if (!user) {
+    return generateDefaultAvatar();
+  }
+  
+  const avatar = user.profilePhoto || user.profilePicture || user.avatar || user.photo;
+  
+  if (avatar) {
+    if (avatar.startsWith('http') || avatar.startsWith('data:')) {
+      return avatar;
+    }
+    
+    const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    return `${baseURL}${avatar.startsWith('/') ? avatar : '/' + avatar}`;
+  }
+  
+  return generateDefaultAvatar(user.username || user.fullName);
+};
+
+const VideoCard = memo(({ video, isActive }) => {
   const videoRef = useRef(null);
   const navigate = useNavigate();
+  const isMountedRef = useRef(true); // 🔧 AJOUT
   
-  // ✅ Vérification de sécurité
   if (!video) {
     return (
       <div className="relative w-full h-full flex justify-center items-center bg-black">
@@ -38,7 +68,6 @@ const VideoCard = ({ video, isActive }) => {
     );
   }
   
-  // ✅ Récupération depuis AuthContext avec getActiveUser()
   const { getActiveUser } = useAuth();
   const currentUser = getActiveUser();
   const { likeVideo, commentVideo, deleteVideo } = useVideos();
@@ -59,74 +88,104 @@ const VideoCard = ({ video, isActive }) => {
   const [newComment, setNewComment] = useState("");
 
   const playAttemptRef = useRef(false);
+  const debugLoggedRef = useRef(false);
 
-  // ✅ Récupérer les infos du propriétaire de la vidéo
-  const videoOwner = video?.uploadedBy || video?.owner || video?.user || {};
-  const ownerId = videoOwner?._id || videoOwner?.id;
-  const ownerUsername = videoOwner?.username || videoOwner?.fullName || "Utilisateur";
-  const ownerAvatar = videoOwner?.profilePicture || videoOwner?.profilePhoto || videoOwner?.avatar || "/default-avatar.png";
-  const ownerVerified = videoOwner?.isVerified || false;
-  
-  // ✅ Vérifier si l'utilisateur actif est le propriétaire
-  const isOwner = currentUser?.user?._id === ownerId || currentUser?.user?.id === ownerId;
+  const videoOwnerData = useMemo(() => {
+    const owner = video?.uploadedBy || video?.owner || video?.user || {};
+    
+    return {
+      id: owner?._id || owner?.id,
+      username: owner?.username || owner?.fullName || "Utilisateur",
+      avatar: getAvatarUrl(owner),
+      verified: owner?.isVerified || false
+    };
+  }, [video?.uploadedBy, video?.owner, video?.user]);
 
-  // Log debug pour vérifier les données utilisateur
+  const isOwner = useMemo(() => {
+    return currentUser?.user?._id === videoOwnerData.id || 
+           currentUser?.user?.id === videoOwnerData.id;
+  }, [currentUser?.user?._id, currentUser?.user?.id, videoOwnerData.id]);
+
   useEffect(() => {
-    if (currentUser) {
-      console.log("👤 Utilisateur actif:", {
-        id: currentUser.user?._id,
-        email: currentUser.user?.email,
-        username: currentUser.user?.username,
-        fullName: currentUser.user?.fullName,
-        profilePhoto: currentUser.user?.profilePhoto,
-        role: currentUser.user?.role,
-        isVerified: currentUser.user?.isVerified,
-        isPremium: currentUser.user?.isPremium
+    if (!debugLoggedRef.current && video) {
+      console.log("📹 [VideoCard] Données:", {
+        videoId: video._id,
+        owner: videoOwnerData,
+        avatarUrl: videoOwnerData.avatar,
       });
+      debugLoggedRef.current = true;
     }
-  }, [currentUser]);
+  }, [video?._id, videoOwnerData]);
 
-console.log("🔍 [VideoCard] Données vidéo reçues:", {
-  videoId: video._id,
-  uploadedBy: video?.uploadedBy,
-  owner: video?.owner,
-  user: video?.user,
-  extractedOwner: videoOwner,
-  ownerId: ownerId,
-  ownerUsername: ownerUsername,
-  ownerAvatar: ownerAvatar
-});
+  // 🔧 CORRECTION: Gestion du montage/démontage
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    return () => {
+      isMountedRef.current = false;
+      const vid = videoRef.current;
+      
+      if (vid) {
+        requestAnimationFrame(() => {
+          try {
+            if (vid) {
+              vid.pause();
+              vid.src = '';
+            }
+          } catch (e) {
+            console.warn("Erreur nettoyage vidéo:", e);
+          }
+        });
+      }
+    };
+  }, []);
 
-  // Gestion lecture automatique
+  // 🔧 CORRECTION: Gestion lecture automatique
   useEffect(() => {
     const vid = videoRef.current;
-    if (!vid) return;
+    if (!vid || !isMountedRef.current) return;
 
     const playVideo = async () => {
+      if (!isMountedRef.current) return;
+      
       try {
         if (vid.readyState < 2) {
           await new Promise((resolve) => {
-            vid.addEventListener("loadeddata", resolve, { once: true });
+            const handler = () => {
+              if (isMountedRef.current) resolve();
+            };
+            vid.addEventListener("loadeddata", handler, { once: true });
+            setTimeout(() => resolve(), 3000);
           });
         }
+
+        if (!isMountedRef.current) return;
 
         if (video.startTime && !playAttemptRef.current) {
           vid.currentTime = video.startTime;
         }
 
-        await vid.play();
-        playAttemptRef.current = true;
-        setIsPaused(false);
+        if (isMountedRef.current) {
+          await vid.play();
+          playAttemptRef.current = true;
+          setIsPaused(false);
+        }
       } catch (err) {
+        if (!isMountedRef.current) return;
+        
         if (err.name === "NotAllowedError") {
           try {
             setMuted(true);
             vid.muted = true;
-            await vid.play();
-            playAttemptRef.current = true;
-            setIsPaused(false);
+            if (isMountedRef.current) {
+              await vid.play();
+              playAttemptRef.current = true;
+              setIsPaused(false);
+            }
           } catch (retryErr) {
-            setError("Impossible de lire la vidéo");
+            if (isMountedRef.current) {
+              setError("Impossible de lire la vidéo");
+            }
           }
         }
       }
@@ -141,16 +200,26 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
     }
 
     return () => {
-      vid.pause();
+      if (vid) {
+        requestAnimationFrame(() => {
+          try {
+            vid.pause();
+          } catch (e) {
+            console.warn("Erreur pause:", e);
+          }
+        });
+      }
     };
   }, [isActive, video.startTime]);
 
-  // Segment de lecture
+  // 🔧 CORRECTION: Segment de lecture
   useEffect(() => {
     const vid = videoRef.current;
-    if (!vid || !video.endTime) return;
+    if (!vid || !video.endTime || !isMountedRef.current) return;
 
     const handleTimeUpdate = () => {
+      if (!isMountedRef.current) return;
+      
       const currentTime = vid.currentTime;
       const duration = video.endTime - (video.startTime || 0);
       setProgress((currentTime - (video.startTime || 0)) / duration * 100);
@@ -161,10 +230,14 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
     };
 
     vid.addEventListener("timeupdate", handleTimeUpdate);
-    return () => vid.removeEventListener("timeupdate", handleTimeUpdate);
+    
+    return () => {
+      if (vid) {
+        vid.removeEventListener("timeupdate", handleTimeUpdate);
+      }
+    };
   }, [video.startTime, video.endTime]);
 
-  // Double-tap like
   const handleDoubleTap = () => {
     if (!isLiked) {
       handleLike();
@@ -173,20 +246,23 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
     setTimeout(() => setShowHeart(false), 1000);
   };
 
+  // 🔧 CORRECTION: Vérification isMountedRef
   const handleToggleMute = () => {
     const vid = videoRef.current;
-    if (!vid) return;
+    if (!vid || !isMountedRef.current) return;
+    
     const newMuted = !muted;
     setMuted(newMuted);
     vid.muted = newMuted;
   };
 
+  // 🔧 CORRECTION: Vérification isMountedRef
   const handlePlayPause = () => {
     const vid = videoRef.current;
-    if (!vid) return;
+    if (!vid || !isMountedRef.current) return;
     
     if (vid.paused) {
-      vid.play();
+      vid.play().catch(e => console.warn('Play error:', e));
       setIsPaused(false);
     } else {
       vid.pause();
@@ -270,8 +346,8 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
   };
 
   const handleBlock = () => {
-    if (window.confirm(`Bloquer @${ownerUsername} ? Vous ne verrez plus leurs vidéos.`)) {
-      alert(`🚫 @${ownerUsername} a été bloqué`);
+    if (window.confirm(`Bloquer @${videoOwnerData.username} ? Vous ne verrez plus leurs vidéos.`)) {
+      alert(`🚫 @${videoOwnerData.username} a été bloqué`);
       setShowOptions(false);
     }
   };
@@ -294,15 +370,14 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
     
-    // ✅ Construction du commentaire avec les données de l'utilisateur actif
     const comment = {
       id: Date.now(),
       user: {
         _id: currentUser?.user?._id,
         username: currentUser?.user?.username || currentUser?.user?.fullName,
         fullName: currentUser?.user?.fullName,
-        profilePicture: currentUser?.user?.profilePhoto || currentUser?.user?.profilePicture,
-        avatar: currentUser?.user?.profilePhoto || currentUser?.user?.avatar,
+        profilePicture: getAvatarUrl(currentUser?.user),
+        avatar: getAvatarUrl(currentUser?.user),
         email: currentUser?.user?.email,
         isVerified: currentUser?.user?.isVerified,
       },
@@ -363,10 +438,10 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 bg-gradient-to-r from-red-600 to-pink-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">
               <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-              LIVE
+              <span>LIVE</span>
             </div>
             <div className="bg-black/80 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full">
-              👁 {formatNumber(video.viewers || 0)}
+              <span>👁 {formatNumber(video.viewers || 0)}</span>
             </div>
           </div>
         </div>
@@ -410,7 +485,7 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
             letterSpacing: "0.05em",
           }}
         >
-          {video.textOverlay}
+          <span>{video.textOverlay}</span>
         </motion.div>
       )}
 
@@ -438,12 +513,16 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
             className="relative"
           >
             <img
-              src={ownerAvatar}
-              alt={ownerUsername}
+              src={videoOwnerData.avatar}
+              alt={videoOwnerData.username}
               className="w-14 h-14 rounded-full object-cover border-2 border-white cursor-pointer shadow-lg"
-              onClick={() => ownerId && navigate(`/profile/${ownerId}`)}
+              onClick={() => videoOwnerData.id && navigate(`/profile/${videoOwnerData.id}`)}
+              onError={(e) => {
+                console.error("❌ Erreur chargement avatar:", videoOwnerData.avatar);
+                e.target.src = generateDefaultAvatar(videoOwnerData.username);
+              }}
             />
-            {ownerVerified && (
+            {videoOwnerData.verified && (
               <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center border-2 border-black">
                 <span className="text-white text-xs">✓</span>
               </div>
@@ -520,7 +599,7 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
           </div>
         </motion.button>
 
-        {/* Bouton son */}
+        {/* Mute */}
         <motion.button
           onClick={handleToggleMute}
           whileTap={{ scale: 0.9 }}
@@ -531,7 +610,7 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
           </div>
         </motion.button>
 
-        {/* Bouton menu options */}
+        {/* Options */}
         <motion.button
           onClick={() => setShowOptions(!showOptions)}
           whileTap={{ scale: 0.9 }}
@@ -542,7 +621,7 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
           </div>
         </motion.button>
 
-        {/* Audio/Music icon */}
+        {/* Music */}
         {video.musicName && (
           <motion.div
             animate={{ rotate: 360 }}
@@ -556,37 +635,33 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
 
       {/* Infos vidéo (bas gauche) */}
       <div className="absolute bottom-20 left-4 right-24 text-white z-40 space-y-2">
-        {/* User info */}
         <div className="flex items-center gap-2">
           <motion.div
             whileHover={{ scale: 1.05 }}
-            onClick={() => ownerId && navigate(`/profile/${ownerId}`)}
+            onClick={() => videoOwnerData.id && navigate(`/profile/${videoOwnerData.id}`)}
             className="cursor-pointer"
           >
             <p className="font-bold text-base drop-shadow-lg hover:underline">
-              @{ownerUsername}
+              @{videoOwnerData.username}
             </p>
           </motion.div>
-          {ownerVerified && (
+          {videoOwnerData.verified && (
             <span className="text-blue-400 text-sm">✓</span>
           )}
         </div>
 
-        {/* Title */}
         {video.title && (
           <p className="font-semibold text-sm drop-shadow-lg line-clamp-1">
             {video.title}
           </p>
         )}
 
-        {/* Description */}
         {video.description && (
           <p className="text-sm opacity-90 drop-shadow-lg line-clamp-2">
             {video.description}
           </p>
         )}
 
-        {/* Music */}
         {video.musicName && (
           <div className="flex items-center gap-2 mt-2 bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-full inline-flex">
             <FaMusic className="text-xs" />
@@ -597,7 +672,7 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
         )}
       </div>
 
-      {/* Panel commentaires */}
+      {/* Panel Commentaires */}
       <AnimatePresence>
         {showComments && (
           <motion.div
@@ -605,13 +680,12 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed bottom-16 left-0 right-0 bg-gray-900/95 backdrop-blur-xl z-50 rounded-t-3xl flex flex-col shadow-2xl"
+            className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-xl z-50 rounded-t-3xl flex flex-col shadow-2xl"
             style={{
-              maxHeight: "calc(100vh - 180px)",
-              paddingBottom: "env(safe-area-inset-bottom, 0px)"
+              maxHeight: "calc(100vh - 100px)",
+              paddingBottom: "env(safe-area-inset-bottom, 20px)"
             }}
           >
-            {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-700">
               <h3 className="text-white font-bold text-lg">
                 {localComments.length} commentaire{localComments.length > 1 ? "s" : ""}
@@ -624,7 +698,6 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
               </button>
             </div>
 
-            {/* Liste commentaires */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {localComments.length === 0 ? (
                 <p className="text-center text-gray-400 py-8">
@@ -634,9 +707,12 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
                 localComments.map((comment, idx) => (
                   <div key={idx} className="flex gap-3">
                     <img
-                      src={comment.user?.profilePicture || comment.user?.profilePhoto || comment.user?.avatar || "/default-avatar.png"}
+                      src={getAvatarUrl(comment.user)}
                       alt={comment.user?.username}
                       className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                      onError={(e) => {
+                        e.target.src = generateDefaultAvatar(comment.user?.username);
+                      }}
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
@@ -657,7 +733,6 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
               )}
             </div>
 
-            {/* Input commentaire */}
             <div className="p-4 border-t border-gray-700 bg-gray-800/50">
               <div className="flex gap-2">
                 <input
@@ -702,7 +777,6 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
               className="fixed inset-0 flex items-center justify-center z-[70] p-4"
             >
               <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl">
-                {/* Header */}
                 <div className="p-6 border-b border-gray-700/50">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-orange-500/20 rounded-full flex items-center justify-center">
@@ -712,9 +786,7 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
                   </div>
                 </div>
 
-                {/* Actions */}
                 <div className="p-2 max-h-[60vh] overflow-y-auto">
-                  {/* Sauvegarder / Favoris */}
                   <motion.button
                     whileTap={{ scale: 0.98 }}
                     onClick={handleSave}
@@ -739,7 +811,6 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
                     </div>
                   </motion.button>
 
-                  {/* Copier lien */}
                   <motion.button
                     whileTap={{ scale: 0.98 }}
                     onClick={handleCopyLink}
@@ -754,7 +825,6 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
                     </div>
                   </motion.button>
 
-                  {/* Télécharger */}
                   <motion.button
                     whileTap={{ scale: 0.98 }}
                     onClick={handleDownload}
@@ -769,7 +839,6 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
                     </div>
                   </motion.button>
 
-                  {/* Signaler (si pas propriétaire) */}
                   {!isOwner && (
                     <motion.button
                       whileTap={{ scale: 0.98 }}
@@ -786,7 +855,6 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
                     </motion.button>
                   )}
 
-                  {/* Bloquer l'utilisateur (si pas propriétaire) */}
                   {!isOwner && (
                     <motion.button
                       whileTap={{ scale: 0.98 }}
@@ -797,13 +865,12 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
                         <FaUserSlash className="text-red-400" />
                       </div>
                       <div>
-                        <p className="text-white font-semibold">Bloquer @{ownerUsername}</p>
+                        <p className="text-white font-semibold">Bloquer @{videoOwnerData.username}</p>
                         <p className="text-gray-400 text-sm">Ne plus voir leurs vidéos</p>
                       </div>
                     </motion.button>
                   )}
 
-                  {/* Supprimer (propriétaire uniquement) */}
                   {isOwner && (
                     <motion.button
                       whileTap={{ scale: 0.98 }}
@@ -821,7 +888,6 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
                   )}
                 </div>
 
-                {/* Bouton annuler */}
                 <div className="p-4 border-t border-gray-700/50">
                   <motion.button
                     whileTap={{ scale: 0.98 }}
@@ -838,6 +904,13 @@ console.log("🔍 [VideoCard] Données vidéo reçues:", {
       </AnimatePresence>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.video?._id === nextProps.video?._id &&
+    prevProps.isActive === nextProps.isActive
+  );
+});
+
+VideoCard.displayName = 'VideoCard';
 
 export default VideoCard;

@@ -1,4 +1,4 @@
-// src/pages/Home/PostCard.jsx - VERSION COMPLÈTE CORRIGÉE
+// src/pages/Home/PostCard.jsx - VERSION CLOUDINARY CORRIGÉE
 import React, { forwardRef, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -18,11 +18,77 @@ import { idbGet, idbSet } from "../../utils/idbMigration";
 import EmojiPicker from "emoji-picker-react";
 
 // ============================================
-// 🎨 Avatar avec photo de profil
+// 🎨 Configuration Cloudinary
+// ============================================
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dlymdclhe";
+const CLOUDINARY_BASE_URL = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/`;
+const CLOUDINARY_VIDEO_URL = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/video/upload/`;
+
+// ============================================
+// 🔧 Fonction pour générer l'URL Cloudinary
+// ============================================
+const getCloudinaryUrl = (publicId, options = {}) => {
+  if (!publicId) return null;
+
+  // Si c'est déjà une URL complète, on la retourne telle quelle
+  if (publicId.startsWith('http://') || publicId.startsWith('https://')) {
+    return publicId;
+  }
+
+  // ✅ NOUVEAU : Détection des anciens chemins locaux
+  // Si c'est un ancien chemin local (uploads/...), utiliser le backend local
+  if (publicId.startsWith('uploads/') || publicId.startsWith('/uploads/')) {
+    const base = import.meta.env.VITE_API_URL || "http://localhost:5000";
+    const cleanPath = publicId.startsWith('/') ? publicId : `/${publicId}`;
+    console.log('📁 Ancien chemin local détecté:', cleanPath);
+    return `${base}${cleanPath}`;
+  }
+
+  // Supprimer les slashes initiaux pour éviter les //
+  publicId = publicId.replace(/^\/+/, '');
+
+  // Vérifier si c'est une vidéo
+  const isVideo = /\.(mp4|webm|mov|avi)$/i.test(publicId);
+  const baseUrl = isVideo ? CLOUDINARY_VIDEO_URL : CLOUDINARY_BASE_URL;
+
+  // Construire les transformations
+  const transformations = [];
+  if (options.width) transformations.push(`w_${options.width}`);
+  if (options.height) transformations.push(`h_${options.height}`);
+  if (options.crop) transformations.push(`c_${options.crop}`);
+  if (options.quality) transformations.push(`q_${options.quality}`);
+  if (options.format) transformations.push(`f_${options.format}`);
+  if (options.gravity) transformations.push(`g_${options.gravity}`); // ✅ Ajout gravity
+  if (!isVideo && transformations.length === 0) transformations.push('f_auto', 'q_auto');
+
+  const transformStr = transformations.length > 0 ? transformations.join(',') + '/' : '';
+
+  return `${baseUrl}${transformStr}${publicId}`;
+};
+
+// ============================================
+// 🔧 Fonction pour obtenir une image optimisée
+// ============================================
+const getOptimizedImageUrl = (publicId, size = 'medium') => {
+  if (!publicId) return null;
+
+  const sizes = {
+    thumbnail: { width: 100, height: 100, crop: 'fill', quality: 60 },
+    small: { width: 300, height: 300, crop: 'limit', quality: 70 },
+    medium: { width: 800, height: 800, crop: 'limit', quality: 80 },
+    large: { width: 1200, height: 1200, crop: 'limit', quality: 85 },
+  };
+
+  return getCloudinaryUrl(publicId, sizes[size] || sizes.medium);
+};
+
+export { getCloudinaryUrl, getOptimizedImageUrl };
+
+// ============================================
+// 🎨 Avatar avec photo de profil Cloudinary
 // ============================================
 const SimpleAvatar = ({ username, profilePhoto, size = 32 }) => {
   const [imageError, setImageError] = useState(false);
-  const base = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   const getInitials = (name) => {
     if (!name) return "?";
@@ -46,13 +112,16 @@ const SimpleAvatar = ({ username, profilePhoto, size = 32 }) => {
     return colors[Math.abs(hash) % colors.length];
   };
 
-  const getPhotoUrl = (photo) => {
-    if (!photo) return null;
-    if (photo.startsWith('http')) return photo;
-    return `${base}${photo.startsWith('/') ? photo : `/${photo}`}`;
-  };
-
-  const photoUrl = getPhotoUrl(profilePhoto);
+  // Utiliser Cloudinary pour les avatars avec optimisation
+  const photoUrl = profilePhoto 
+    ? getCloudinaryUrl(profilePhoto, { 
+        width: size * 2, // 2x pour écrans retina
+        height: size * 2, 
+        crop: 'fill', 
+        quality: 80,
+        gravity: 'face' // Focus sur le visage
+      })
+    : null;
 
   if (photoUrl && !imageError) {
     return (
@@ -62,10 +131,10 @@ const SimpleAvatar = ({ username, profilePhoto, size = 32 }) => {
         className="rounded-full object-cover border-2 border-orange-200"
         style={{ width: size, height: size }}
         onError={() => {
-          console.log('❌ Erreur chargement photo:', photoUrl);
+          console.log('❌ Erreur chargement photo Cloudinary:', photoUrl);
           setImageError(true);
         }}
-        onLoad={() => console.log('✅ Photo chargée:', photoUrl)}
+        onLoad={() => console.log('✅ Photo Cloudinary chargée:', photoUrl)}
       />
     );
   }
@@ -402,20 +471,30 @@ const PostCard = forwardRef(({ post, onDeleted, showToast }, ref) => {
     }
   };
 
+  // ✅ Extraction des médias avec support Cloudinary
   const getMediaUrls = (media) => {
     if (!media) return [];
     const medias = Array.isArray(media) ? media : [media];
+    
     return medias
       .map(m => {
-        const url = typeof m === "string" ? m : m?.url || m?.path || m?.location;
-        if (!url) return null;
-        return url.startsWith("http") ? url : `${base}${url.startsWith("/") ? url : `/${url}`}`;
+        // Extraire l'URL ou le publicId
+        let mediaId = typeof m === "string" ? m : m?.url || m?.path || m?.location || m?.publicId;
+        if (!mediaId) return null;
+
+        // Si c'est déjà une URL complète, utiliser getCloudinaryUrl pour l'optimisation
+        if (mediaId.startsWith("http")) {
+          return mediaId;
+        }
+
+        // Sinon, c'est un publicId Cloudinary
+        return getOptimizedImageUrl(mediaId, 'large');
       })
       .filter(Boolean);
   };
 
   const mediaUrls = getMediaUrls(post.media);
-  const isVideo = (url) => /\.(mp4|webm|mov)$/i.test(url);
+  const isVideo = (url) => /\.(mp4|webm|mov)$/i.test(url) || url.includes('/video/upload/');
 
   const handlePrevMedia = () => {
     setCurrentMediaIndex((prev) => (prev === 0 ? mediaUrls.length - 1 : prev - 1));
@@ -512,7 +591,6 @@ const PostCard = forwardRef(({ post, onDeleted, showToast }, ref) => {
                 isFollowing ? "bg-gray-100 text-gray-700 hover:bg-gray-200" : "bg-orange-500 text-white hover:bg-orange-600"
               }`}
             >
-              {/* ✅ CORRECTION : Rendu conditionnel stable */}
               {isFollowing ? (
                 <>
                   <UserMinusIcon className="w-4 h-4" />
@@ -545,7 +623,7 @@ const PostCard = forwardRef(({ post, onDeleted, showToast }, ref) => {
         </div>
       )}
 
-      {/* Médias */}
+      {/* Médias avec Cloudinary */}
       {mediaUrls.length > 0 && (
         <div 
           ref={mediaContainerRef}
@@ -564,13 +642,20 @@ const PostCard = forwardRef(({ post, onDeleted, showToast }, ref) => {
             {mediaUrls.map((url, idx) => (
               <div key={idx} className="w-full h-full flex-shrink-0">
                 {isVideo(url) ? (
-                  <video src={url} controls className="w-full h-full object-cover" />
+                  <video 
+                    src={url} 
+                    controls 
+                    className="w-full h-full object-cover"
+                    preload="metadata"
+                  />
                 ) : (
                   <img 
                     src={url} 
-                    alt="media" 
+                    alt={`media ${idx + 1}`}
                     className="w-full h-full object-cover"
+                    loading="lazy"
                     onError={(e) => {
+                      console.error('❌ Erreur chargement média Cloudinary:', url);
                       e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23ddd' width='400' height='300'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EImage non disponible%3C/text%3E%3C/svg%3E";
                     }}
                   />
