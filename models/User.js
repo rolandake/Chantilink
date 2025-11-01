@@ -1,4 +1,4 @@
-// backend/models/User.js - VERSION COMPLÈTE FINALE - CHANTILINK
+// backend/models/User.js - VERSION CORRIGÉE - CHANTILINK
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
@@ -35,7 +35,7 @@ const userSchema = new mongoose.Schema(
     phone: {
       type: String,
       unique: true,
-      sparse: true, // Permet que certains users n'aient pas de phone
+      sparse: true,
       trim: true,
       match: [/^\+?[0-9]{10,15}$/, "Numéro de téléphone invalide"],
     },
@@ -47,7 +47,7 @@ const userSchema = new mongoose.Schema(
 
     phoneVerificationCode: {
       type: String,
-      select: false, // on ne le renvoie jamais au client
+      select: false,
     },
 
     phoneVerificationExpires: {
@@ -137,7 +137,7 @@ const userSchema = new mongoose.Schema(
       {
         title: { type: String, required: true, maxlength: 100 },
         message: { type: String, required: true, maxlength: 500 },
-        text: { type: String, maxlength: 500 }, // Pour compatibilité Header
+        text: { type: String, maxlength: 500 },
         read: { type: Boolean, default: false },
         createdAt: { type: Date, default: Date.now },
         type: { type: String, enum: ["admin", "system", "user"], default: "admin" }
@@ -238,23 +238,16 @@ userSchema.methods.toPublicJSON = function () {
 // 📇 MÉTHODES CONTACTS
 // ========================
 
-/**
- * Synchroniser les contacts depuis l'appareil
- * @param {Array} contactsList - Liste des contacts [{name, phone}]
- * @returns {Array} Liste des contacts synchronisés avec infos Chantilink
- */
 userSchema.methods.syncContacts = async function (contactsList) {
   const syncedContacts = [];
   const thisUser = this;
   
   for (const contact of contactsList) {
-    // Normaliser le numéro (supprimer espaces, tirets, parenthèses)
     const normalizedPhone = contact.phone
       .replace(/[\s\-\(\)\.]/g, '')
       .replace(/^00/, '+')
-      .replace(/^0/, '+225'); // Adapter selon votre pays par défaut
+      .replace(/^0/, '+225');
     
-    // Chercher si ce numéro existe sur Chantilink
     const foundUser = await mongoose.model('User').findOne({ 
       phone: normalizedPhone 
     }).select('_id fullName profilePhoto phone');
@@ -268,7 +261,6 @@ userSchema.methods.syncContacts = async function (contactsList) {
       addedAt: new Date()
     });
 
-    // Si l'utilisateur existe sur Chantilink, l'ajouter automatiquement dans ses contacts aussi
     if (foundUser) {
       await mongoose.model('User').updateOne(
         { _id: foundUser._id },
@@ -294,21 +286,12 @@ userSchema.methods.syncContacts = async function (contactsList) {
   return syncedContacts;
 };
 
-/**
- * Obtenir les contacts qui sont sur Chantilink
- * @returns {Array} Liste des ObjectId des contacts sur Chantilink
- */
 userSchema.methods.getContactsOnChantilink = function () {
   return this.contacts
     .filter(c => c.isOnChantilink && c.userId)
     .map(c => c.userId);
 };
 
-/**
- * Vérifier si un utilisateur est dans les contacts
- * @param {ObjectId} userId - ID de l'utilisateur à vérifier
- * @returns {Boolean}
- */
 userSchema.methods.isContact = function (userId) {
   return this.contacts.some(
     c => c.userId && c.userId.toString() === userId.toString()
@@ -319,11 +302,6 @@ userSchema.methods.isContact = function (userId) {
 // 💬 MÉTHODES CHAT
 // ========================
 
-/**
- * Vérifier si peut chatter avec un autre utilisateur
- * @param {ObjectId} otherUserId - ID de l'utilisateur cible
- * @returns {Object} {allowed, reason, type}
- */
 userSchema.methods.canChatWith = async function (otherUserId) {
   const otherUser = await mongoose.model('User').findById(otherUserId);
   
@@ -331,7 +309,6 @@ userSchema.methods.canChatWith = async function (otherUserId) {
     return { allowed: false, reason: "user_not_found" };
   }
   
-  // 1. Vérifier si bloqué
   if (otherUser.blocked.includes(this._id)) {
     return { allowed: false, reason: "blocked_by_user" };
   }
@@ -340,17 +317,14 @@ userSchema.methods.canChatWith = async function (otherUserId) {
     return { allowed: false, reason: "you_blocked_user" };
   }
   
-  // 2. Vérifier si dans les contacts
   if (this.isContact(otherUserId) && otherUser.chatSettings?.allowContactsToMessage) {
     return { allowed: true, reason: "contact", type: "contact" };
   }
   
-  // 3. Vérifier si amis
   if (this.friends.includes(otherUserId) && otherUser.chatSettings?.allowFriendsToMessage) {
     return { allowed: true, reason: "friend", type: "friend" };
   }
   
-  // 4. Vérifier si paramètres ouverts
   if (otherUser.chatSettings?.allowStoryReplyFromAnyone) {
     return { allowed: true, reason: "open_settings", type: "open" };
   }
@@ -361,8 +335,10 @@ userSchema.methods.canChatWith = async function (otherUserId) {
 // ========================
 // 📦 Index pour performance
 // ========================
-userSchema.index({ email: 1 }, { unique: true });
-userSchema.index({ phone: 1 }, { unique: true, sparse: true });
+// CORRECTION: Index supprimé car déjà défini avec "unique: true"
+// userSchema.index({ email: 1 }, { unique: true }); ❌ SUPPRIMÉ
+// userSchema.index({ phone: 1 }, { unique: true, sparse: true }); ❌ SUPPRIMÉ
+
 userSchema.index({ fullName: 1 });
 userSchema.index({ role: 1 });
 userSchema.index({ createdAt: -1 });
