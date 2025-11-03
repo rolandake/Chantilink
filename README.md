@@ -21,10 +21,4 @@ Gestion de projets de construction
 Analyse de plans avec IA : calcul automatique des coûts, matériaux et planification
 Publication et visualisation de vidéos en direct
 Notifications et alertes pour les échéances et événements importants
-Profils utilisateurs et gestion sécurisée des comptes<img width="404" height="632" alt="Capture d&#39;écran 2025-10-31 001518" src="https://github.com/user-attachments/assets/d7b25b7d-9226-4d03-8354-098ef680aa70" />
-<img width="405" height="624" alt="Capture d&#39;écran 2025-10-31 001428" src="https://github.com/user-attachments/assets/29aa0b5f-f118-476e-8bc3-21aed01debb9" />
-<img width="392" height="620" alt="Capture d&#39;écran 2025-10-31 001341" src="https://github.com/user-attachments/assets/154d3464-bbeb-4cee-a3e0-9386f4c6d8ee" />
-<img width="404" height="632" alt="Capture d&#39;écran 2025-10-31 001247" src="https://github.com/user-attachments/assets/a7e941fd-5996-4481-ac43-02249fe777b5" />
-<img width="405" height="625" alt="Capture d&#39;écran 2025-10-31 001225" src="https://github.com/user-attachments/assets/9c38a173-0f8f-49f7-9038-114e8da543cb" />
-<img width="317" height="318" alt="Capture d&#39;écran 2025-10-31 001015" src="https://github.com/user-attachments/assets/e2716e47-bf1b-413a-92e6-75d17956ac34" />
-
+Profils utilisateurs et gestion sécurisée des comptes<img width="501" height="335" alt="Capture d&#39;écran 2025-11-02 013516" src="https://github.com/user-attachments/assets/37a4560f-b715-4daa-8bc2-eb70e74e5ff1" />
