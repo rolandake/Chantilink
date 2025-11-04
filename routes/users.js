@@ -6,19 +6,9 @@ import mongoose from "mongoose";
 import User from "../models/User.js";
 import { verifyToken, verifyTokenAdmin } from "../middleware/auth.js";
 import { uploadFile, deleteFile } from "../utils/cloudinaryServer.js";
-import pino from "pino";
+import moduleLogger from "../config/moduleLogger.js";
 
 const router = express.Router();
-
-// ============================================
-// 📋 LOGGER
-// ============================================
-const logger = pino({
-  transport: {
-    target: "pino-pretty",
-    options: { colorize: true, translateTime: "HH:MM:ss" },
-  },
-}).child({ module: "userRoutes" });
 
 // ============================================
 // 📂 CONFIGURATION MULTER (Memory Storage pour Cloudinary)
@@ -37,7 +27,7 @@ const upload = multer({
 }).fields([
   { name: "profilePhoto", maxCount: 1 },
   { name: "coverPhoto", maxCount: 1 },
-]);
+]);moduleLogger
 
 // ============================================
 // 🔧 Helper pour extraire le publicId depuis une URL Cloudinary
