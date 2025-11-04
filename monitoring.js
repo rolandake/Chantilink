@@ -1,6 +1,6 @@
 // backend/monitoring.js
 import pino from "pino";
-import pinoHttp from "pino-http";
+import logger from "./config/moduleLogger.js";
 
 // Configuration du logger Pino
 const logger = pino({
