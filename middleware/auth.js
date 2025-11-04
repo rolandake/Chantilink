@@ -2,7 +2,7 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import rateLimit from "express-rate-limit";
-import logger from "../config/logger.js"; // Import du logger centralisé
+import logger from "../config/moduleLogger.js";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 
