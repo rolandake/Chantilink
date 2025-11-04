@@ -1,4 +1,4 @@
-// backend/routes/authRoutes.js
+// backend/routes/authRoutes.js - VERSION PRODUCTION READY
 import express from "express";
 import {
   register,
@@ -10,14 +10,7 @@ import {
 } from "../controllers/authController.js";
 import { verifyToken } from "../middleware/auth.js";
 import User from "../models/User.js";
-import pino from "pino";
-
-const logger = pino({
-  transport: {
-    target: "pino-pretty",
-    options: { colorize: true, translateTime: "HH:MM:ss" },
-  },
-});
+import logger from "../config/logger.js"; // Import du logger centralisé
 
 const router = express.Router();
 
@@ -25,10 +18,14 @@ const router = express.Router();
 // DEBUG MIDDLEWARE - Avant chaque route
 // ============================================
 router.use((req, res, next) => {
-  logger.info(`📍 [ROUTE] ${req.method} ${req.path}`);
-  logger.info(`📦 [BODY] ${JSON.stringify(req.body)}`);
-  logger.info(`🔑 [HEADERS] Authorization: ${req.headers.authorization ? "Present" : "Missing"}`);
-  logger.info(`🍪 [COOKIES] token: ${req.cookies?.token ? "Present" : "Missing"}, refreshToken: ${req.cookies?.refreshToken ? "Present" : "Missing"}`);
+  logger.info({
+    method: req.method,
+    path: req.path,
+    body: req.body,
+    hasAuth: !!req.headers.authorization,
+    hasTokenCookie: !!req.cookies?.token,
+    hasRefreshCookie: !!req.cookies?.refreshToken,
+  }, `📍 ${req.method} ${req.path}`);
   next();
 });
 
@@ -42,15 +39,13 @@ router.use((req, res, next) => {
  * Body: { fullName, email, confirmEmail, password }
  */
 router.post("/register", (req, res, next) => {
-  logger.warn("═══════════════════════════════════════════════════");
-  logger.warn("🚀 [REGISTER ROUTE] Request intercepted");
-  logger.warn(`📧 Email: ${req.body.email}`);
-  logger.warn(`👤 FullName: ${req.body.fullName}`);
-  logger.warn(`✅ Passant au middleware authLimiter...`);
-  logger.warn("═══════════════════════════════════════════════════");
+  logger.info({
+    email: req.body.email,
+    fullName: req.body.fullName,
+  }, "🚀 REGISTER - Début du processus d'inscription");
   next();
 }, authLimiter, (req, res, next) => {
-  logger.warn("✅ [REGISTER] Après authLimiter, avant authController.register");
+  logger.debug("✅ REGISTER - Après authLimiter");
   next();
 }, register);
 
@@ -60,13 +55,12 @@ router.post("/register", (req, res, next) => {
  * Body: { email, password }
  */
 router.post("/login", (req, res, next) => {
-  logger.info("═══════════════════════════════════════════════════");
-  logger.info("🔐 [LOGIN ROUTE] Request intercepted");
-  logger.info(`📧 Email: ${req.body.email}`);
-  logger.info("═══════════════════════════════════════════════════");
+  logger.info({
+    email: req.body.email,
+  }, "🔐 LOGIN - Tentative de connexion");
   next();
 }, authLimiter, (req, res, next) => {
-  logger.info("✅ [LOGIN] Après authLimiter, avant authController.login");
+  logger.debug("✅ LOGIN - Après authLimiter");
   next();
 }, login);
 
@@ -76,10 +70,9 @@ router.post("/login", (req, res, next) => {
  * Cookies: refreshToken
  */
 router.post("/refresh-token", (req, res, next) => {
-  logger.info("═══════════════════════════════════════════════════");
-  logger.info("🔄 [REFRESH-TOKEN] Request intercepted");
-  logger.info(`🍪 refreshToken present: ${req.cookies?.refreshToken ? "YES" : "NO"}`);
-  logger.info("═══════════════════════════════════════════════════");
+  logger.info({
+    hasRefreshToken: !!req.cookies?.refreshToken,
+  }, "🔄 REFRESH-TOKEN - Demande de rafraîchissement");
   next();
 }, refreshToken);
 
@@ -87,7 +80,7 @@ router.post("/refresh-token", (req, res, next) => {
  * POST /api/auth/refresh (alias pour compatibilité)
  */
 router.post("/refresh", (req, res, next) => {
-  logger.info("🔄 [REFRESH-ALIAS] Redirigé vers /refresh-token");
+  logger.debug("🔄 REFRESH - Alias redirigé vers /refresh-token");
   next();
 }, refreshToken);
 
@@ -100,24 +93,30 @@ router.post("/refresh", (req, res, next) => {
  * Vérifier la validité du token
  */
 router.get("/verify", (req, res, next) => {
-  logger.info("═══════════════════════════════════════════════════");
-  logger.info("✅ [VERIFY] Request intercepted");
-  logger.info(`🔑 Token present: ${req.headers.authorization ? "YES" : "NO"}`);
-  logger.info("═══════════════════════════════════════════════════");
+  logger.info({
+    hasAuth: !!req.headers.authorization,
+    hasCookie: !!req.cookies?.token,
+  }, "✅ VERIFY - Vérification du token");
   next();
 }, verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
     
     if (!user) {
-      logger.warn(`⚠️ [VERIFY] Utilisateur introuvable: ${req.user.id}`);
+      logger.warn({
+        userId: req.user.id,
+      }, "⚠️ VERIFY - Utilisateur introuvable");
+      
       return res.status(404).json({
         valid: false,
         message: "Utilisateur introuvable",
       });
     }
     
-    logger.info(`✅ [VERIFY] Token valide pour: ${user.email}`);
+    logger.info({
+      userId: user._id,
+      email: user.email,
+    }, "✅ VERIFY - Token valide");
     
     res.status(200).json({
       valid: true,
@@ -139,7 +138,11 @@ router.get("/verify", (req, res, next) => {
       },
     });
   } catch (err) {
-    logger.error("❌ [VERIFY] Erreur:", err);
+    logger.error({
+      err,
+      userId: req.user?.id,
+    }, "❌ VERIFY - Erreur lors de la vérification");
+    
     res.status(401).json({
       valid: false,
       message: "Token invalide",
@@ -152,13 +155,15 @@ router.get("/verify", (req, res, next) => {
  * Récupérer les infos de l'utilisateur connecté
  */
 router.get("/me", (req, res, next) => {
-  logger.info("═══════════════════════════════════════════════════");
-  logger.info("👤 [ME ROUTE] Request intercepted");
-  logger.info(`🔑 Token present: ${req.headers.authorization ? "YES" : "NO"}`);
-  logger.info("═══════════════════════════════════════════════════");
+  logger.info({
+    hasAuth: !!req.headers.authorization,
+  }, "👤 ME - Récupération des infos utilisateur");
   next();
 }, verifyToken, (req, res, next) => {
-  logger.info("✅ [ME] Après verifyToken, req.user:", req.user);
+  logger.debug({
+    userId: req.user?.id,
+    email: req.user?.email,
+  }, "✅ ME - Après verifyToken");
   next();
 }, getCurrentUser);
 
@@ -167,7 +172,7 @@ router.get("/me", (req, res, next) => {
  * Déconnexion (clear cookies)
  */
 router.post("/logout", (req, res, next) => {
-  logger.info("🔒 [LOGOUT] Request intercepted");
+  logger.info("🔒 LOGOUT - Déconnexion utilisateur");
   next();
 }, logout);
 
@@ -175,8 +180,16 @@ router.post("/logout", (req, res, next) => {
 // ERROR HANDLER
 // ============================================
 router.use((err, req, res, next) => {
-  logger.error("❌ [ROUTE ERROR]", err);
-  res.status(500).json({ message: "Route error", error: err.message });
+  logger.error({
+    err,
+    method: req.method,
+    path: req.path,
+  }, "❌ ROUTE ERROR - Erreur dans authRoutes");
+  
+  res.status(err.status || 500).json({ 
+    message: err.message || "Erreur serveur", 
+    error: process.env.NODE_ENV === "development" ? err.message : undefined 
+  });
 });
 
 export default router;
