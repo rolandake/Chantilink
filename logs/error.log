@@ -101,3 +101,8 @@
 {"level":50,"time":1761909699748,"pid":18484,"hostname":"ABATE-hp","msg":"❌ Erreur MongoDB :"}
 {"level":50,"time":1761919679459,"pid":13624,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
 {"level":50,"time":1761938928258,"pid":1452,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1762052012264,"pid":1648,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1762093678611,"pid":15364,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1762120273520,"pid":15856,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1762217830537,"pid":11120,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}
+{"level":50,"time":1762256644217,"pid":14520,"hostname":"ABATE-hp","msg":"❌ [Messages] Connexion sans authentification - REFUSÉE"}

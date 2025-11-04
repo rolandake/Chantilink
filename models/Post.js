@@ -1,4 +1,4 @@
-// backend/models/Post.js
+// backend/models/Post.js - VERSION AVEC CLOUDINARY URLs
 import mongoose from "mongoose";
 
 const commentSchema = new mongoose.Schema({
@@ -8,8 +8,8 @@ const commentSchema = new mongoose.Schema({
     username: { type: String },
     fullName: { type: String },
     profilePhoto: { type: String },
-    isVerified: { type: Boolean, default: false }, // ✅ AJOUT
-    isPremium: { type: Boolean, default: false },   // ✅ AJOUT
+    isVerified: { type: Boolean, default: false },
+    isPremium: { type: Boolean, default: false },
   },
   createdAt: { type: Date, default: Date.now },
 });
@@ -20,11 +20,17 @@ const postSchema = new mongoose.Schema({
     username: { type: String },
     fullName: { type: String },
     profilePhoto: { type: String },
-    isVerified: { type: Boolean, default: false }, // ✅ AJOUT
-    isPremium: { type: Boolean, default: false },   // ✅ AJOUT
+    isVerified: { type: Boolean, default: false },
+    isPremium: { type: Boolean, default: false },
   },
   content: { type: String },
-  media: [{ type: String }],
+  
+  // ✅ MODIFICATION CRITIQUE: media stocke maintenant les URLs complètes
+  media: [{ type: String }], // URLs Cloudinary complètes (secure_url)
+  
+  // ✅ NOUVEAU: Stocke les public_ids pour la suppression
+  mediaPublicIds: [{ type: String }], // public_ids Cloudinary (ex: "posts/123-image.jpg")
+  
   mediaType: { type: String, enum: ["image", "video", null] },
   location: { type: String },
   privacy: { type: String, default: "Public" },

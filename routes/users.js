@@ -1,17 +1,18 @@
 // backend/routes/userRoutes.js - VERSION OPTIMISÉE FINALE
+
+// backend/routes/userRoutes.js - VERSION CLOUDINARY
 import express from "express";
 import multer from "multer";
-import path from "path";
-import fs from "fs/promises";
 import mongoose from "mongoose";
 import User from "../models/User.js";
 import { verifyToken, verifyTokenAdmin } from "../middleware/auth.js";
+import { uploadFile, deleteFile } from "../utils/cloudinaryServer.js";
 import pino from "pino";
 
 const router = express.Router();
 
 // ============================================
-// 📋 LOGGER AVEC MODULE
+// 📋 LOGGER
 // ============================================
 const logger = pino({
   transport: {
@@ -21,29 +22,11 @@ const logger = pino({
 }).child({ module: "userRoutes" });
 
 // ============================================
-// 📂 CONFIGURATION MULTER
+// 📂 CONFIGURATION MULTER (Memory Storage pour Cloudinary)
 // ============================================
-const userStorage = multer.diskStorage({
-  destination: async (req, file, cb) => {
-    const dir = path.join(process.cwd(), "uploads/users");
-    await fs.mkdir(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const userId = req.user?.id || "anonymous";
-    const name = path.parse(file.originalname).name
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9\-]/g, "");
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${userId}-${Date.now()}-${name || "file"}${ext}`);
-  },
-});
-
+const storage = multer.memoryStorage();
 const upload = multer({
-  storage: userStorage,
+  storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
   fileFilter: (req, file, cb) => {
     const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -58,22 +41,36 @@ const upload = multer({
 ]);
 
 // ============================================
-// 🗑️ FONCTION BACKUP OPTIMISÉE
+// 🔧 Helper pour extraire le publicId depuis une URL Cloudinary
 // ============================================
-const backupFile = async (filePath) => {
-  if (!filePath) return;
+const extractPublicId = (url) => {
+  if (!url) return null;
+  
+  // Si c'est déjà un publicId (users/xxx ou covers/xxx)
+  if (!url.startsWith('http')) return url;
   
   try {
-    const fileExists = await fs.stat(filePath).catch(() => false);
-    if (!fileExists) return;
+    // Extraire de l'URL Cloudinary
+    // Format: https://res.cloudinary.com/xxx/image/upload/v123456/folder/publicId.ext
+    const urlParts = url.split('/');
+    const uploadIndex = urlParts.indexOf('upload');
     
-    const backupDir = path.join(process.cwd(), "uploads/backup");
-    await fs.mkdir(backupDir, { recursive: true });
-    const dest = path.join(backupDir, path.basename(filePath));
-    await fs.rename(filePath, dest);
-    logger.info(`✅ Ancien fichier sauvegardé : ${dest}`);
+    if (uploadIndex === -1) return null;
+    
+    // Tout après 'upload/v123456/' ou 'upload/'
+    let pathAfterUpload = urlParts.slice(uploadIndex + 1);
+    
+    // Enlever la version si présente (v123456)
+    if (pathAfterUpload[0].startsWith('v')) {
+      pathAfterUpload = pathAfterUpload.slice(1);
+    }
+    
+    // Rejoindre et enlever l'extension
+    const fullPath = pathAfterUpload.join('/');
+    return fullPath.replace(/\.[^/.]+$/, ''); // Enlever l'extension
   } catch (err) {
-    logger.error("❌ Erreur backup ancien fichier :", err);
+    console.error('❌ Erreur extraction publicId:', err);
+    return null;
   }
 };
 
@@ -222,7 +219,7 @@ router.get("/friend-requests", verifyToken, async (req, res) => {
 });
 
 // ============================================
-// 📱 PUT /api/users/update-phone - AJOUT TÉLÉPHONE
+// 📱 PUT /api/users/update-phone
 // ============================================
 router.put("/update-phone", verifyToken, async (req, res) => {
   try {
@@ -262,7 +259,7 @@ router.put("/update-phone", verifyToken, async (req, res) => {
       { 
         phone: normalizedPhone,
         phoneVerified: false,
-        hasSeenPhoneModal: true // ✅ AJOUTÉ - Marquer le modal comme vu
+        hasSeenPhoneModal: true
       },
       { 
         new: true,
@@ -295,7 +292,7 @@ router.put("/update-phone", verifyToken, async (req, res) => {
 });
 
 // ============================================
-// ✅ POST /api/users/seen-phone-modal - MARQUER MODAL VU
+// ✅ POST /api/users/seen-phone-modal
 // ============================================
 router.post("/seen-phone-modal", verifyToken, async (req, res) => {
   try {
@@ -330,7 +327,7 @@ router.post("/seen-phone-modal", verifyToken, async (req, res) => {
 });
 
 // ============================================
-// 📱 DELETE /api/users/remove-phone - SUPPRIMER TÉLÉPHONE
+// 📱 DELETE /api/users/remove-phone
 // ============================================
 router.delete("/remove-phone", verifyToken, async (req, res) => {
   try {
@@ -356,7 +353,7 @@ router.delete("/remove-phone", verifyToken, async (req, res) => {
 });
 
 // ============================================
-// 📱 GET /api/users/check-phone/:phone - VÉRIFIER TÉLÉPHONE
+// 📱 GET /api/users/check-phone/:phone
 // ============================================
 router.get("/check-phone/:phone", verifyToken, async (req, res) => {
   try {
@@ -447,7 +444,7 @@ router.put("/:userId", verifyToken, async (req, res) => {
     }
 
     const updateData = {};
-    const { fullName, email, bio, pageContent, location, website } = req.body;
+    const { fullName, email, bio, pageContent, location, website, profilePhoto, coverPhoto } = req.body;
 
     if (fullName !== undefined) updateData.fullName = fullName.trim();
     if (email !== undefined) updateData.email = email.trim().toLowerCase();
@@ -455,6 +452,10 @@ router.put("/:userId", verifyToken, async (req, res) => {
     if (pageContent !== undefined) updateData.pageContent = pageContent.trim();
     if (location !== undefined) updateData.location = location.trim();
     if (website !== undefined) updateData.website = website.trim();
+    
+    // ✅ Accepter les URLs Cloudinary
+    if (profilePhoto !== undefined) updateData.profilePhoto = profilePhoto;
+    if (coverPhoto !== undefined) updateData.coverPhoto = coverPhoto;
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
@@ -488,7 +489,7 @@ router.put("/:userId", verifyToken, async (req, res) => {
 });
 
 // ============================================
-// 📸 PUT /api/users/:userId/images - UPLOAD IMAGES
+// 📸 PUT /api/users/:userId/images - UPLOAD IMAGES CLOUDINARY
 // ============================================
 router.put("/:userId/images", verifyToken, (req, res) => {
   upload(req, res, async (err) => {
@@ -539,29 +540,61 @@ router.put("/:userId/images", verifyToken, (req, res) => {
 
       const updateData = {};
 
+      // ✅ Upload photo de profil sur Cloudinary
       if (req.files?.profilePhoto?.[0]) {
         const file = req.files.profilePhoto[0];
-        if (user.profilePhoto && user.profilePhoto !== "/default-avatar.png") {
-          const oldPath = path.join(
-            process.cwd(),
-            user.profilePhoto.replace(/^\//, "")
-          );
-          await backupFile(oldPath);
+        
+        // Supprimer ancienne photo sur Cloudinary
+        if (user.profilePhoto) {
+          const oldPublicId = extractPublicId(user.profilePhoto);
+          if (oldPublicId) {
+            try {
+              await deleteFile(oldPublicId);
+              logger.info(`🗑️ Ancienne photo profil supprimée: ${oldPublicId}`);
+            } catch (delErr) {
+              logger.warn("⚠️ Erreur suppression ancienne photo profil:", delErr);
+            }
+          }
         }
-        updateData.profilePhoto = `/uploads/users/${file.filename}`;
+
+        // Upload vers Cloudinary
+        const result = await uploadFile(
+          file.buffer,
+          "users",
+          file.originalname,
+          "image"
+        );
+
+        updateData.profilePhoto = result.secure_url;
         logger.info(`📸 Nouvelle photo de profil : ${updateData.profilePhoto}`);
       }
 
+      // ✅ Upload photo de couverture sur Cloudinary
       if (req.files?.coverPhoto?.[0]) {
         const file = req.files.coverPhoto[0];
+        
+        // Supprimer ancienne photo sur Cloudinary
         if (user.coverPhoto) {
-          const oldPath = path.join(
-            process.cwd(),
-            user.coverPhoto.replace(/^\//, "")
-          );
-          await backupFile(oldPath);
+          const oldPublicId = extractPublicId(user.coverPhoto);
+          if (oldPublicId) {
+            try {
+              await deleteFile(oldPublicId);
+              logger.info(`🗑️ Ancienne photo couverture supprimée: ${oldPublicId}`);
+            } catch (delErr) {
+              logger.warn("⚠️ Erreur suppression ancienne photo couverture:", delErr);
+            }
+          }
         }
-        updateData.coverPhoto = `/uploads/users/${file.filename}`;
+
+        // Upload vers Cloudinary
+        const result = await uploadFile(
+          file.buffer,
+          "covers",
+          file.originalname,
+          "image"
+        );
+
+        updateData.coverPhoto = result.secure_url;
         logger.info(`📸 Nouvelle photo de couverture : ${updateData.coverPhoto}`);
       }
 
@@ -598,7 +631,7 @@ router.put("/:userId/images", verifyToken, (req, res) => {
 });
 
 // ============================================
-// ➕ POST /api/users/:userId/follow - SUIVRE
+// ➕ POST /api/users/:userId/follow
 // ============================================
 router.post("/:userId/follow", verifyToken, async (req, res) => {
   try {
@@ -652,7 +685,7 @@ router.post("/:userId/follow", verifyToken, async (req, res) => {
 });
 
 // ============================================
-// ➖ POST /api/users/:userId/unfollow - NE PLUS SUIVRE
+// ➖ POST /api/users/:userId/unfollow
 // ============================================
 router.post("/:userId/unfollow", verifyToken, async (req, res) => {
   try {
@@ -704,7 +737,6 @@ router.post("/:userId/unfollow", verifyToken, async (req, res) => {
     res.status(500).json({ success: false, message: "Erreur serveur" });
   }
 });
-
 // ============================================
 // 🔔 GET /api/users/:id/notifications - NOTIFICATIONS
 // ============================================

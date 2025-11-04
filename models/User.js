@@ -2,6 +2,33 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
+// ========================
+// 🔔 SCHÉMA DE NOTIFICATION
+// ========================
+const notificationSchema = new mongoose.Schema({
+  type: { 
+    type: String, 
+    enum: ["like", "comment", "follow", "share", "mention", "friend_request", "admin", "system", "user"],
+    required: true 
+  },
+  title: { type: String, maxlength: 100 },
+  message: { type: String, maxlength: 500 },
+  text: { type: String, maxlength: 500 },
+  sender: {
+    _id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    fullName: { type: String },
+    profilePhoto: { type: String },
+    isVerified: { type: Boolean, default: false },
+  },
+  post: {
+    _id: { type: mongoose.Schema.Types.ObjectId, ref: "Post" },
+    content: { type: String },
+    media: { type: String },
+  },
+  read: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+});
+
 const userSchema = new mongoose.Schema(
   {
     // ========================
@@ -131,18 +158,9 @@ const userSchema = new mongoose.Schema(
     lastSeen: { type: Date, default: Date.now },
 
     // ========================
-    // 🔔 Notifications
+    // 🔔 NOTIFICATIONS
     // ========================
-    notifications: [
-      {
-        title: { type: String, required: true, maxlength: 100 },
-        message: { type: String, required: true, maxlength: 500 },
-        text: { type: String, maxlength: 500 },
-        read: { type: Boolean, default: false },
-        createdAt: { type: Date, default: Date.now },
-        type: { type: String, enum: ["admin", "system", "user"], default: "admin" }
-      }
-    ],
+    notifications: [notificationSchema],
 
     // ========================
     // ⚙️ Statut & rôle
@@ -335,10 +353,6 @@ userSchema.methods.canChatWith = async function (otherUserId) {
 // ========================
 // 📦 Index pour performance
 // ========================
-// CORRECTION: Index supprimé car déjà défini avec "unique: true"
-// userSchema.index({ email: 1 }, { unique: true }); ❌ SUPPRIMÉ
-// userSchema.index({ phone: 1 }, { unique: true, sparse: true }); ❌ SUPPRIMÉ
-
 userSchema.index({ fullName: 1 });
 userSchema.index({ role: 1 });
 userSchema.index({ createdAt: -1 });

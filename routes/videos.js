@@ -1,11 +1,18 @@
-// backend/routes/videos.js - Cloudinary-ready
+// backend/routes/videos.js - VERSION CORRIGÉE
 import express from "express";
 import multer from "multer";
-import { uploadFile } from "../utils/cloudinaryServer.js";
+import { v2 as cloudinary } from "cloudinary"; // 🔧 AJOUTÉ
 import { verifyToken } from "../middleware/auth.js";
 import Video from "../models/Video.js";
 
 const router = express.Router();
+
+// 🔧 Configuration Cloudinary (si pas déjà fait dans server.js)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 // ------------------------------
 // Multer en mémoire
@@ -53,7 +60,7 @@ router.get("/", async (req, res) => {
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (err) {
-    console.error("Erreur GET /videos:", err);
+    console.error("❌ Erreur GET /videos:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -73,7 +80,7 @@ router.get("/:id", async (req, res) => {
     if (videoObj.url) videoObj.url = buildFullURL(req, videoObj.url);
     res.json(videoObj);
   } catch (err) {
-    console.error("Erreur GET /videos/:id:", err);
+    console.error("❌ Erreur GET /videos/:id:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -83,39 +90,93 @@ router.get("/:id", async (req, res) => {
 // ------------------------------
 router.post("/", verifyToken, upload.single("video"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: "Aucun fichier uploadé" });
-    const { title, description, startTime, endTime, filter, textOverlay, textColor, textPosX, textPosY } = req.body;
+    console.log("📹 Upload vidéo - Début");
+    
+    if (!req.file) {
+      console.log("❌ Aucun fichier reçu");
+      return res.status(400).json({ error: "Aucun fichier uploadé" });
+    }
 
-    if (!title) return res.status(400).json({ error: "Le titre est obligatoire" });
+    console.log("📦 Fichier reçu:", {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: `${(req.file.size / 1024 / 1024).toFixed(2)} MB`
+    });
+
+    const { title, description, metadata } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: "Le titre est obligatoire" });
+    }
+
+    // Parser metadata si présent
+    let parsedMetadata = {};
+    if (metadata) {
+      try {
+        parsedMetadata = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+      } catch (e) {
+        console.warn("⚠️ Erreur parsing metadata:", e);
+      }
+    }
+
+    console.log("☁️ Upload vers Cloudinary...");
 
     // Upload vers Cloudinary
     const result = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
-        { resource_type: "video", folder: "videos" },
-        (error, result) => (error ? reject(error) : resolve(result))
+        {
+          resource_type: "video",
+          folder: "videos",
+          // Options d'optimisation
+          eager: [
+            { 
+              streaming_profile: "full_hd",
+              format: "m3u8" 
+            }
+          ],
+          eager_async: true,
+        },
+        (error, result) => {
+          if (error) {
+            console.error("❌ Erreur Cloudinary:", error);
+            reject(error);
+          } else {
+            console.log("✅ Upload Cloudinary réussi:", result.public_id);
+            resolve(result);
+          }
+        }
       );
       stream.end(req.file.buffer);
     });
 
+    console.log("💾 Sauvegarde en base de données...");
+
+    // Créer le document vidéo
     const newVideo = new Video({
       title: title.trim(),
       description: description?.trim() || "",
       url: result.secure_url,
       uploadedBy: req.user.id,
-      startTime: parseFloat(startTime) || 0,
-      endTime: parseFloat(endTime) || 0,
-      filter: filter || "none",
-      textOverlay: textOverlay || "",
-      textColor: textColor || "#ffffff",
+      startTime: parseFloat(parsedMetadata.startTime) || 0,
+      endTime: parseFloat(parsedMetadata.endTime) || 60,
+      duration: parseFloat(parsedMetadata.duration) || result.duration || 0,
+      filter: parsedMetadata.filter || "none",
+      textOverlay: parsedMetadata.textOverlay || "",
+      textColor: parsedMetadata.textColor || "#ffffff",
       textPos: {
-        x: parseFloat(textPosX) || 50,
-        y: parseFloat(textPosY) || 10,
+        x: parseFloat(parsedMetadata.textPosition?.x) || 50,
+        y: parseFloat(parsedMetadata.textPosition?.y) || 10,
       },
+      musicName: parsedMetadata.musicName || "",
+      privacy: parsedMetadata.privacy || "public",
+      allowComments: parsedMetadata.allowComments !== false,
+      allowDuet: parsedMetadata.allowDuet !== false,
       likes: 0,
       comments: [],
       views: 0,
       isLive: false,
       cloudinary_id: result.public_id,
+      thumbnail: result.eager?.[0]?.secure_url || result.secure_url,
     });
 
     const savedVideo = await newVideo.save();
@@ -124,10 +185,20 @@ router.post("/", verifyToken, upload.single("video"), async (req, res) => {
       "_id username fullName email profilePicture profilePhoto avatar isVerified role isPremium"
     );
 
-    res.status(201).json(populatedVideo);
+    console.log("✅ Vidéo créée avec succès:", savedVideo._id);
+
+    res.status(201).json({
+      success: true,
+      data: populatedVideo,
+      video: populatedVideo,
+      message: "Vidéo uploadée avec succès"
+    });
   } catch (err) {
-    console.error("Erreur POST /videos:", err);
-    res.status(500).json({ error: err.message || "Erreur serveur" });
+    console.error("❌ Erreur POST /videos:", err);
+    res.status(500).json({ 
+      error: err.message || "Erreur serveur",
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 
@@ -141,6 +212,7 @@ router.post("/:id/like", verifyToken, async (req, res) => {
 
     const userId = req.user.id;
     const hasLiked = video.likedBy?.includes(userId);
+    
     if (hasLiked) {
       video.likedBy = video.likedBy.filter(id => id.toString() !== userId);
       video.likes = Math.max(0, (video.likes || 0) - 1);
@@ -150,9 +222,12 @@ router.post("/:id/like", verifyToken, async (req, res) => {
     }
 
     await video.save();
+    
+    console.log(`${hasLiked ? '💔' : '❤️'} Like vidéo ${req.params.id} par user ${userId}`);
+    
     res.json({ success: true, likes: video.likes, userLiked: !hasLiked });
   } catch (err) {
-    console.error("Erreur POST /videos/:id/like:", err);
+    console.error("❌ Erreur POST /videos/:id/like:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -183,9 +258,11 @@ router.post("/:id/comment", verifyToken, async (req, res) => {
       select: "_id username fullName email profilePicture profilePhoto avatar isVerified",
     });
 
+    console.log(`💬 Nouveau commentaire sur vidéo ${req.params.id}`);
+    
     res.json({ success: true, comments: populatedVideo.comments });
   } catch (err) {
-    console.error("Erreur POST /videos/:id/comment:", err);
+    console.error("❌ Erreur POST /videos/:id/comment:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -203,7 +280,7 @@ router.post("/:id/view", async (req, res) => {
 
     res.json({ success: true, views: video.views });
   } catch (err) {
-    console.error("Erreur POST /videos/:id/view:", err);
+    console.error("❌ Erreur POST /videos/:id/view:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -222,13 +299,57 @@ router.delete("/:id", verifyToken, async (req, res) => {
 
     // Supprimer sur Cloudinary
     if (video.cloudinary_id) {
-      await cloudinary.uploader.destroy(video.cloudinary_id, { resource_type: "video" });
+      try {
+        await cloudinary.uploader.destroy(video.cloudinary_id, { resource_type: "video" });
+        console.log(`🗑️ Vidéo supprimée de Cloudinary: ${video.cloudinary_id}`);
+      } catch (cloudError) {
+        console.warn("⚠️ Erreur suppression Cloudinary:", cloudError);
+        // On continue quand même pour supprimer de la BDD
+      }
     }
 
     await Video.findByIdAndDelete(req.params.id);
+    console.log(`✅ Vidéo supprimée: ${req.params.id}`);
+    
     res.json({ success: true, message: "Vidéo supprimée" });
   } catch (err) {
-    console.error("Erreur DELETE /videos/:id:", err);
+    console.error("❌ Erreur DELETE /videos/:id:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+// ------------------------------
+// PUT - Modifier une vidéo
+// ------------------------------
+router.put("/:id", verifyToken, async (req, res) => {
+  try {
+    const video = await Video.findById(req.params.id);
+    if (!video) return res.status(404).json({ error: "Vidéo non trouvée" });
+
+    if (video.uploadedBy.toString() !== req.user.id) {
+      return res.status(403).json({ error: "Vous n'avez pas la permission de modifier cette vidéo" });
+    }
+
+    const { title, description, privacy, allowComments, allowDuet } = req.body;
+
+    if (title) video.title = title.trim();
+    if (description !== undefined) video.description = description.trim();
+    if (privacy) video.privacy = privacy;
+    if (allowComments !== undefined) video.allowComments = allowComments;
+    if (allowDuet !== undefined) video.allowDuet = allowDuet;
+
+    await video.save();
+    
+    const populatedVideo = await video.populate(
+      "uploadedBy",
+      "_id username fullName email profilePicture profilePhoto avatar isVerified role isPremium"
+    );
+
+    console.log(`✏️ Vidéo modifiée: ${req.params.id}`);
+    
+    res.json({ success: true, data: populatedVideo });
+  } catch (err) {
+    console.error("❌ Erreur PUT /videos/:id:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
