@@ -5,12 +5,17 @@ import User from "../models/User.js";
 import pino from "pino";
 import rateLimit from "express-rate-limit";
 
-const logger = pino({
-  transport: {
-    target: "pino-pretty",
-    options: { colorize: true, translateTime: "HH:MM:ss" },
-  },
-});
+// ✅ Configuration Pino adaptée à l'environnement
+const logger = pino(
+  process.env.NODE_ENV === "production"
+    ? {} // En production : logs JSON simples
+    : {
+        transport: {
+          target: "pino-pretty",
+          options: { colorize: true, translateTime: "HH:MM:ss" },
+        },
+      }
+);
 
 // ✅ Validation stricte des secrets au démarrage
 const JWT_SECRET = process.env.JWT_SECRET;
