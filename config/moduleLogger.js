@@ -4,55 +4,48 @@ import pino from "pino";
 const isDevelopment = process.env.NODE_ENV !== "production";
 const logLevel = process.env.LOG_LEVEL || (isDevelopment ? "debug" : "info");
 
-let logger;
-
-// Configuration pour le développement (avec pino-pretty)
-if (isDevelopment) {
-  logger = pino(
-    pino.transport({
-      target: "pino-pretty",
-      options: {
-        colorize: true,
-        translateTime: "HH:MM:ss Z",
-        ignore: "pid,hostname",
-        singleLine: false,
-        messageFormat: "{levelLabel} - {msg}",
-      },
-    }),
-    {
-      level: logLevel,
-    }
-  );
-} else {
-  // Configuration pour la production (JSON structuré)
-  logger = pino({
-    level: logLevel,
-    formatters: {
-      level: (label) => ({ level: label.toUpperCase() }),
-      bindings: (bindings) => ({
-        pid: bindings.pid,
-        host: bindings.hostname,
-        node_version: process.version,
-      }),
-    },
-    timestamp: () => `,"time":"${new Date().toISOString()}"`,
-    serializers: {
-      req: (req) => ({
-        method: req.method,
-        url: req.url,
-        path: req.path,
-        parameters: req.params,
-        headers: {
-          host: req.headers.host,
-          "user-agent": req.headers["user-agent"],
-          "content-type": req.headers["content-type"],
+// Logger principal
+const logger = isDevelopment
+  ? pino(
+      pino.transport({
+        target: "pino-pretty",
+        options: {
+          colorize: true,
+          translateTime: "HH:MM:ss Z",
+          ignore: "pid,hostname",
+          singleLine: false,
+          messageFormat: "{levelLabel} - {msg}",
         },
       }),
-      res: (res) => ({ statusCode: res.statusCode }),
-      err: pino.stdSerializers.err,
-    },
-  });
-}
+      { level: logLevel }
+    )
+  : pino({
+      level: logLevel,
+      formatters: {
+        level: (label) => ({ level: label.toUpperCase() }),
+        bindings: (bindings) => ({
+          pid: bindings.pid,
+          host: bindings.hostname,
+          node_version: process.version,
+        }),
+      },
+      timestamp: () => `,"time":"${new Date().toISOString()}"`,
+      serializers: {
+        req: (req) => ({
+          method: req.method,
+          url: req.url,
+          path: req.path,
+          parameters: req.params,
+          headers: {
+            host: req.headers.host,
+            "user-agent": req.headers["user-agent"],
+            "content-type": req.headers["content-type"],
+          },
+        }),
+        res: (res) => ({ statusCode: res.statusCode }),
+        err: pino.stdSerializers.err,
+      },
+    });
 
 // Helpers de logging
 export const logInfo = (msg, data = {}) => logger.info({ ...data }, msg);
