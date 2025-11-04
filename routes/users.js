@@ -1,6 +1,5 @@
 // backend/routes/userRoutes.js - VERSION OPTIMISÉE FINALE
 
-// backend/routes/userRoutes.js - VERSION CLOUDINARY
 import express from "express";
 import multer from "multer";
 import mongoose from "mongoose";
@@ -107,7 +106,7 @@ router.get("/", verifyToken, async (req, res) => {
 
     const total = await User.countDocuments(query);
 
-    logger.info(`👥 ${users.length} utilisateurs récupérés (page ${page}/${Math.ceil(total / limit)})`);
+    moduleLogger.info(`👥 ${users.length} utilisateurs récupérés (page ${page}/${Math.ceil(total / limit)})`);
 
     res.status(200).json({
       success: true,
@@ -120,7 +119,7 @@ router.get("/", verifyToken, async (req, res) => {
       },
     });
   } catch (err) {
-    logger.error("❌ Erreur GET /api/users:", err);
+    moduleLogger.error("❌ Erreur GET /api/users:", err);
     res.status(500).json({
       success: false,
       message: "Erreur serveur",
@@ -153,7 +152,7 @@ router.get("/search", verifyToken, async (req, res) => {
       .limit(20)
       .lean();
 
-    logger.info(`🔍 Recherche "${q}": ${users.length} résultats`);
+    moduleLogger.info(`🔍 Recherche "${q}": ${users.length} résultats`);
 
     res.status(200).json({
       success: true,
@@ -161,7 +160,7 @@ router.get("/search", verifyToken, async (req, res) => {
       count: users.length,
     });
   } catch (err) {
-    logger.error("❌ Erreur search users:", err);
+    moduleLogger.error("❌ Erreur search users:", err);
     res.status(500).json({ success: false, message: "Erreur serveur" });
   }
 });
@@ -187,7 +186,7 @@ router.get("/friends", verifyToken, async (req, res) => {
       friends: user.friends || [],
     });
   } catch (err) {
-    logger.error("❌ Erreur GET /friends:", err);
+    moduleLogger.error("❌ Erreur GET /friends:", err);
     res.status(500).json({ success: false, message: "Erreur serveur" });
   }
 });
@@ -213,7 +212,7 @@ router.get("/friend-requests", verifyToken, async (req, res) => {
       friendRequests: user.friendRequests || [],
     });
   } catch (err) {
-    logger.error("❌ Erreur GET friend-requests:", err);
+    moduleLogger.error("❌ Erreur GET friend-requests:", err);
     res.status(500).json({ success: false, message: "Erreur serveur" });
   }
 });
@@ -274,7 +273,7 @@ router.put("/update-phone", verifyToken, async (req, res) => {
       });
     }
 
-    logger.info(`📱 Numéro ajouté: ${normalizedPhone} pour ${updatedUser.email}`);
+    moduleLogger.info(`📱 Numéro ajouté: ${normalizedPhone} pour ${updatedUser.email}`);
 
     res.status(200).json({
       success: true,
@@ -282,7 +281,7 @@ router.put("/update-phone", verifyToken, async (req, res) => {
       user: updatedUser,
     });
   } catch (err) {
-    logger.error("❌ Erreur PUT /update-phone:", err);
+    moduleLogger.error("❌ Erreur PUT /update-phone:", err);
     res.status(500).json({
       success: false,
       message: "Erreur serveur",
@@ -309,7 +308,7 @@ router.post("/seen-phone-modal", verifyToken, async (req, res) => {
       });
     }
 
-    logger.info(`✅ Modal téléphone marqué comme vu pour ${updatedUser.email}`);
+    moduleLogger.info(`✅ Modal téléphone marqué comme vu pour ${updatedUser.email}`);
 
     res.status(200).json({
       success: true,
@@ -317,7 +316,7 @@ router.post("/seen-phone-modal", verifyToken, async (req, res) => {
       user: updatedUser,
     });
   } catch (err) {
-    logger.error("❌ Erreur seen-phone-modal:", err);
+    moduleLogger.error("❌ Erreur seen-phone-modal:", err);
     res.status(500).json({
       success: false,
       message: "Erreur serveur",
@@ -339,7 +338,7 @@ router.delete("/remove-phone", verifyToken, async (req, res) => {
       { new: true }
     ).select("-password");
 
-    logger.info(`📱 Numéro supprimé pour ${updatedUser.email}`);
+    moduleLogger.info(`📱 Numéro supprimé pour ${updatedUser.email}`);
 
     res.status(200).json({
       success: true,
@@ -347,7 +346,7 @@ router.delete("/remove-phone", verifyToken, async (req, res) => {
       user: updatedUser,
     });
   } catch (err) {
-    logger.error("❌ Erreur remove-phone:", err);
+    moduleLogger.error("❌ Erreur remove-phone:", err);
     res.status(500).json({ success: false, message: "Erreur serveur" });
   }
 });
@@ -376,7 +375,7 @@ router.get("/check-phone/:phone", verifyToken, async (req, res) => {
       user,
     });
   } catch (err) {
-    logger.error("❌ Erreur check-phone:", err);
+    moduleLogger.error("❌ Erreur check-phone:", err);
     res.status(500).json({ success: false, message: "Erreur serveur" });
   }
 });
@@ -408,7 +407,7 @@ router.get("/:userId", async (req, res) => {
 
     res.status(200).json({ success: true, user });
   } catch (err) {
-    logger.error("❌ Erreur GET user by ID:", err);
+    moduleLogger.error("❌ Erreur GET user by ID:", err);
     res.status(500).json({ success: false, message: "Erreur serveur" });
   }
 });
@@ -471,7 +470,7 @@ router.put("/:userId", verifyToken, async (req, res) => {
       .select("-password")
       .lean();
 
-    logger.info(`✏️ Profil mis à jour: ${updatedUser.email}`);
+    moduleLogger.info(`✏️ Profil mis à jour: ${updatedUser.email}`);
 
     res.status(200).json({
       success: true,
@@ -479,7 +478,7 @@ router.put("/:userId", verifyToken, async (req, res) => {
       user: updatedUser,
     });
   } catch (err) {
-    logger.error("❌ Erreur PUT /api/users/:userId:", err);
+    moduleLogger.error("❌ Erreur PUT /api/users/:userId:", err);
     res.status(500).json({
       success: false,
       message: "Erreur serveur",
@@ -508,7 +507,7 @@ router.put("/:userId/images", verifyToken, (req, res) => {
     }
     
     if (err) {
-      logger.error("❌ Erreur multer:", err);
+      moduleLogger.error("❌ Erreur multer:", err);
       return res.status(400).json({ success: false, message: err.message });
     }
 
@@ -550,9 +549,9 @@ router.put("/:userId/images", verifyToken, (req, res) => {
           if (oldPublicId) {
             try {
               await deleteFile(oldPublicId);
-              logger.info(`🗑️ Ancienne photo profil supprimée: ${oldPublicId}`);
+              moduleLogger.info(`🗑️ Ancienne photo profil supprimée: ${oldPublicId}`);
             } catch (delErr) {
-              logger.warn("⚠️ Erreur suppression ancienne photo profil:", delErr);
+              moduleLogger.warn("⚠️ Erreur suppression ancienne photo profil:", delErr);
             }
           }
         }
@@ -566,7 +565,7 @@ router.put("/:userId/images", verifyToken, (req, res) => {
         );
 
         updateData.profilePhoto = result.secure_url;
-        logger.info(`📸 Nouvelle photo de profil : ${updateData.profilePhoto}`);
+        moduleLogger.info(`📸 Nouvelle photo de profil : ${updateData.profilePhoto}`);
       }
 
       // ✅ Upload photo de couverture sur Cloudinary
@@ -579,9 +578,9 @@ router.put("/:userId/images", verifyToken, (req, res) => {
           if (oldPublicId) {
             try {
               await deleteFile(oldPublicId);
-              logger.info(`🗑️ Ancienne photo couverture supprimée: ${oldPublicId}`);
+              moduleLogger.info(`🗑️ Ancienne photo couverture supprimée: ${oldPublicId}`);
             } catch (delErr) {
-              logger.warn("⚠️ Erreur suppression ancienne photo couverture:", delErr);
+              moduleLogger.warn("⚠️ Erreur suppression ancienne photo couverture:", delErr);
             }
           }
         }
@@ -595,7 +594,7 @@ router.put("/:userId/images", verifyToken, (req, res) => {
         );
 
         updateData.coverPhoto = result.secure_url;
-        logger.info(`📸 Nouvelle photo de couverture : ${updateData.coverPhoto}`);
+        moduleLogger.info(`📸 Nouvelle photo de couverture : ${updateData.coverPhoto}`);
       }
 
       if (Object.keys(updateData).length === 0) {
@@ -612,7 +611,7 @@ router.put("/:userId/images", verifyToken, (req, res) => {
         .select("-password")
         .lean();
 
-      logger.info(`✅ Images mises à jour: ${updatedUser.email}`);
+      moduleLogger.info(`✅ Images mises à jour: ${updatedUser.email}`);
 
       res.status(200).json({
         success: true,
@@ -620,7 +619,7 @@ router.put("/:userId/images", verifyToken, (req, res) => {
         user: updatedUser,
       });
     } catch (err) {
-      logger.error("❌ Erreur PUT /api/users/:userId/images:", err);
+      moduleLogger.error("❌ Erreur PUT /api/users/:userId/images:", err);
       res.status(500).json({
         success: false,
         message: "Erreur serveur",
@@ -667,7 +666,7 @@ router.post("/:userId/follow", verifyToken, async (req, res) => {
       $addToSet: { followers: currentUserId },
     });
 
-    logger.info(`➕ ${req.user.email} suit ${targetUser.email}`);
+    moduleLogger.info(`➕ ${req.user.email} suit ${targetUser.email}`);
 
     res.status(200).json({
       success: true,
@@ -679,7 +678,7 @@ router.post("/:userId/follow", verifyToken, async (req, res) => {
       },
     });
   } catch (err) {
-    logger.error("❌ Erreur follow:", err);
+    moduleLogger.error("❌ Erreur follow:", err);
     res.status(500).json({ success: false, message: "Erreur serveur" });
   }
 });
@@ -721,7 +720,7 @@ router.post("/:userId/unfollow", verifyToken, async (req, res) => {
       $pull: { followers: currentUserId },
     });
 
-    logger.info(`➖ ${req.user.email} ne suit plus ${targetUser.email}`);
+    moduleLogger.info(`➖ ${req.user.email} ne suit plus ${targetUser.email}`);
 
     res.status(200).json({
       success: true,
@@ -733,7 +732,7 @@ router.post("/:userId/unfollow", verifyToken, async (req, res) => {
       },
     });
   } catch (err) {
-    logger.error("❌ Erreur unfollow:", err);
+    moduleLogger.error("❌ Erreur unfollow:", err);
     res.status(500).json({ success: false, message: "Erreur serveur" });
   }
 });
@@ -769,7 +768,7 @@ router.get('/:id/notifications', verifyToken, async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('❌ Erreur récupération notifications:', error);
+    moduleLogger.error('❌ Erreur récupération notifications:', error);
     res.status(500).json({ 
       message: 'Erreur serveur',
       error: error.message 
@@ -805,7 +804,7 @@ router.patch('/:id/notifications/read-all', verifyToken, async (req, res) => {
       
       await user.save();
       
-      logger.info(`✅ ${user.notifications.length} notifications marquées comme lues pour ${user.email}`);
+      moduleLogger.info(`✅ ${user.notifications.length} notifications marquées comme lues pour ${user.email}`);
     }
 
     res.json({ 
@@ -815,7 +814,7 @@ router.patch('/:id/notifications/read-all', verifyToken, async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('❌ Erreur marquage notifications:', error);
+    moduleLogger.error('❌ Erreur marquage notifications:', error);
     res.status(500).json({ 
       message: 'Erreur serveur',
       error: error.message 
@@ -860,7 +859,7 @@ router.delete('/:id/notifications/:notificationId', verifyToken, async (req, res
 
     await user.save();
     
-    logger.info(`✅ Notification ${notificationId} supprimée pour ${user.email}`);
+    moduleLogger.info(`✅ Notification ${notificationId} supprimée pour ${user.email}`);
 
     res.json({ 
       success: true,
@@ -869,7 +868,7 @@ router.delete('/:id/notifications/:notificationId', verifyToken, async (req, res
     });
 
   } catch (error) {
-    logger.error('❌ Erreur suppression notification:', error);
+    moduleLogger.error('❌ Erreur suppression notification:', error);
     res.status(500).json({ 
       message: 'Erreur serveur',
       error: error.message 
@@ -927,14 +926,14 @@ router.post("/friend-request/:userId", verifyToken, async (req, res) => {
     recipient.friendRequests.push(senderId);
     await recipient.save();
 
-    logger.info(`➕ Demande d'ami: ${sender.email} → ${recipient.email}`);
+    moduleLogger.info(`➕ Demande d'ami: ${sender.email} → ${recipient.email}`);
 
     res.status(200).json({
       success: true,
       message: "Demande d'ami envoyée",
     });
   } catch (err) {
-    logger.error("❌ Erreur friend-request:", err);
+    moduleLogger.error("❌ Erreur friend-request:", err);
     res.status(500).json({ success: false, message: "Erreur serveur" });
   }
 });
@@ -988,14 +987,14 @@ router.post("/friend-request/:userId/accept", verifyToken, async (req, res) => {
     await recipient.save();
     await sender.save();
 
-    logger.info(`✅ Amitié acceptée: ${sender.email} ↔ ${recipient.email}`);
+    moduleLogger.info(`✅ Amitié acceptée: ${sender.email} ↔ ${recipient.email}`);
 
     res.status(200).json({
       success: true,
       message: "Demande acceptée",
     });
   } catch (err) {
-    logger.error("❌ Erreur accept friend:", err);
+    moduleLogger.error("❌ Erreur accept friend:", err);
     res.status(500).json({ success: false, message: "Erreur serveur" });
   }
 });
@@ -1023,14 +1022,14 @@ router.post("/friend-request/:userId/decline", verifyToken, async (req, res) => 
 
     await recipient.save();
 
-    logger.info(`❌ Demande refusée: ${senderId} → ${recipientId}`);
+    moduleLogger.info(`❌ Demande refusée: ${senderId} → ${recipientId}`);
 
     res.status(200).json({
       success: true,
       message: "Demande refusée",
     });
   } catch (err) {
-    logger.error("❌ Erreur decline friend:", err);
+    moduleLogger.error("❌ Erreur decline friend:", err);
     res.status(500).json({ success: false, message: "Erreur serveur" });
   }
 });
@@ -1070,14 +1069,14 @@ router.delete("/friends/:userId", verifyToken, async (req, res) => {
     await currentUser.save();
     await friend.save();
 
-    logger.info(`➖ Amitié retirée: ${currentUser.email} ↔ ${friend.email}`);
+    moduleLogger.info(`➖ Amitié retirée: ${currentUser.email} ↔ ${friend.email}`);
 
     res.status(200).json({
       success: true,
       message: "Ami retiré",
     });
   } catch (err) {
-    logger.error("❌ Erreur DELETE friend:", err);
+    moduleLogger.error("❌ Erreur DELETE friend:", err);
     res.status(500).json({ success: false, message: "Erreur serveur" });
   }
 });
@@ -1116,14 +1115,14 @@ router.delete("/:userId", verifyTokenAdmin, async (req, res) => {
 
     await User.findByIdAndDelete(userId);
 
-    logger.warn(`🗑️ Utilisateur supprimé: ${user.email} par ${req.user.email}`);
+    moduleLogger.warn(`🗑️ Utilisateur supprimé: ${user.email} par ${req.user.email}`);
 
     res.status(200).json({
       success: true,
       message: "Utilisateur supprimé avec succès",
     });
   } catch (err) {
-    logger.error("❌ Erreur DELETE user:", err);
+    moduleLogger.error("❌ Erreur DELETE user:", err);
     res.status(500).json({ success: false, message: "Erreur serveur" });
   }
 });

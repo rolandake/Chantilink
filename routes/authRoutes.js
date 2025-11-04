@@ -10,7 +10,7 @@ import {
 } from "../controllers/authController.js";
 import { verifyToken } from "../middleware/auth.js";
 import User from "../models/User.js";
-import logger from "../config/logger.js"; // Import du logger centralisé
+import logger from "../config/moduleLogger.js"; // Import du logger centralisé
 
 const router = express.Router();
 
@@ -18,7 +18,7 @@ const router = express.Router();
 // DEBUG MIDDLEWARE - Avant chaque route
 // ============================================
 router.use((req, res, next) => {
-  logger.info({
+  moduleLogger.info({
     method: req.method,
     path: req.path,
     body: req.body,
@@ -39,13 +39,13 @@ router.use((req, res, next) => {
  * Body: { fullName, email, confirmEmail, password }
  */
 router.post("/register", (req, res, next) => {
-  logger.info({
+  moduleLogger.info({
     email: req.body.email,
     fullName: req.body.fullName,
   }, "🚀 REGISTER - Début du processus d'inscription");
   next();
 }, authLimiter, (req, res, next) => {
-  logger.debug("✅ REGISTER - Après authLimiter");
+  moduleLogger.debug("✅ REGISTER - Après authLimiter");
   next();
 }, register);
 
@@ -55,12 +55,12 @@ router.post("/register", (req, res, next) => {
  * Body: { email, password }
  */
 router.post("/login", (req, res, next) => {
-  logger.info({
+  moduleLogger.info({
     email: req.body.email,
   }, "🔐 LOGIN - Tentative de connexion");
   next();
 }, authLimiter, (req, res, next) => {
-  logger.debug("✅ LOGIN - Après authLimiter");
+  moduleLogger.debug("✅ LOGIN - Après authLimiter");
   next();
 }, login);
 
@@ -70,7 +70,7 @@ router.post("/login", (req, res, next) => {
  * Cookies: refreshToken
  */
 router.post("/refresh-token", (req, res, next) => {
-  logger.info({
+  moduleLogger.info({
     hasRefreshToken: !!req.cookies?.refreshToken,
   }, "🔄 REFRESH-TOKEN - Demande de rafraîchissement");
   next();
@@ -80,7 +80,7 @@ router.post("/refresh-token", (req, res, next) => {
  * POST /api/auth/refresh (alias pour compatibilité)
  */
 router.post("/refresh", (req, res, next) => {
-  logger.debug("🔄 REFRESH - Alias redirigé vers /refresh-token");
+  moduleLogger.debug("🔄 REFRESH - Alias redirigé vers /refresh-token");
   next();
 }, refreshToken);
 
@@ -93,7 +93,7 @@ router.post("/refresh", (req, res, next) => {
  * Vérifier la validité du token
  */
 router.get("/verify", (req, res, next) => {
-  logger.info({
+  moduleLogger.info({
     hasAuth: !!req.headers.authorization,
     hasCookie: !!req.cookies?.token,
   }, "✅ VERIFY - Vérification du token");
@@ -103,7 +103,7 @@ router.get("/verify", (req, res, next) => {
     const user = await User.findById(req.user.id).select("-password");
     
     if (!user) {
-      logger.warn({
+      moduleLogger.warn({
         userId: req.user.id,
       }, "⚠️ VERIFY - Utilisateur introuvable");
       
@@ -113,7 +113,7 @@ router.get("/verify", (req, res, next) => {
       });
     }
     
-    logger.info({
+    moduleLogger.info({
       userId: user._id,
       email: user.email,
     }, "✅ VERIFY - Token valide");
@@ -138,7 +138,7 @@ router.get("/verify", (req, res, next) => {
       },
     });
   } catch (err) {
-    logger.error({
+    moduleLogger.error({
       err,
       userId: req.user?.id,
     }, "❌ VERIFY - Erreur lors de la vérification");
@@ -155,12 +155,12 @@ router.get("/verify", (req, res, next) => {
  * Récupérer les infos de l'utilisateur connecté
  */
 router.get("/me", (req, res, next) => {
-  logger.info({
+  moduleLogger.info({
     hasAuth: !!req.headers.authorization,
   }, "👤 ME - Récupération des infos utilisateur");
   next();
 }, verifyToken, (req, res, next) => {
-  logger.debug({
+  moduleLogger.debug({
     userId: req.user?.id,
     email: req.user?.email,
   }, "✅ ME - Après verifyToken");
@@ -172,7 +172,7 @@ router.get("/me", (req, res, next) => {
  * Déconnexion (clear cookies)
  */
 router.post("/logout", (req, res, next) => {
-  logger.info("🔒 LOGOUT - Déconnexion utilisateur");
+  moduleLogger.info("🔒 LOGOUT - Déconnexion utilisateur");
   next();
 }, logout);
 
@@ -180,7 +180,7 @@ router.post("/logout", (req, res, next) => {
 // ERROR HANDLER
 // ============================================
 router.use((err, req, res, next) => {
-  logger.error({
+  moduleLogger.error({
     err,
     method: req.method,
     path: req.path,

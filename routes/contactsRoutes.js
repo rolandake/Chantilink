@@ -21,8 +21,8 @@ router.post("/sync", verifyToken, async (req, res) => {
     const { contacts } = req.body;
     const userId = req.user.id;
 
-    logger.info(`📞 [Contacts] Synchro pour user ${userId}`);
-    logger.debug(`📞 [Contacts] ${contacts?.length || 0} contacts reçus`);
+    moduleLogger.info(`📞 [Contacts] Synchro pour user ${userId}`);
+    moduleLogger.debug(`📞 [Contacts] ${contacts?.length || 0} contacts reçus`);
 
     // VALIDATION AMÉLIORÉE
     if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
@@ -69,10 +69,10 @@ router.post("/sync", verifyToken, async (req, res) => {
           addedAt: new Date()
         });
 
-        logger.debug(`✓ Contact traité: ${contact.name} -> ${foundUser ? 'Sur Chantilink' : 'Non trouvé'}`);
+        moduleLogger.debug(`✓ Contact traité: ${contact.name} -> ${foundUser ? 'Sur Chantilink' : 'Non trouvé'}`);
       } catch (err) {
         errors.push(`Erreur contact ${contact.name}: ${err.message}`);
-        logger.error(`❌ Erreur traitement contact:`, err);
+        moduleLogger.error(`❌ Erreur traitement contact:`, err);
       }
     }
 
@@ -85,10 +85,10 @@ router.post("/sync", verifyToken, async (req, res) => {
     const onChantilink = syncedContacts.filter(c => c.isOnChantilink);
     const notOnChantilink = syncedContacts.filter(c => !c.isOnChantilink);
 
-    logger.info(`✅ [Contacts] Synchro OK: ${onChantilink.length}/${syncedContacts.length} sur Chantilink`);
+    moduleLogger.info(`✅ [Contacts] Synchro OK: ${onChantilink.length}/${syncedContacts.length} sur Chantilink`);
     
     if (errors.length > 0) {
-      logger.warn(`⚠️ [Contacts] ${errors.length} erreurs pendant la synchro`);
+      moduleLogger.warn(`⚠️ [Contacts] ${errors.length} erreurs pendant la synchro`);
     }
 
     // RÉPONSE AVEC DONNÉES COMPLÈTES
@@ -115,7 +115,7 @@ router.post("/sync", verifyToken, async (req, res) => {
       warnings: errors.length > 0 ? errors : undefined
     });
   } catch (err) {
-    logger.error(`❌ [Contacts] Erreur synchro:`, err);
+    moduleLogger.error(`❌ [Contacts] Erreur synchro:`, err);
     res.status(500).json({ 
       message: "Erreur lors de la synchronisation des contacts",
       error: err.message,
@@ -243,7 +243,7 @@ router.get("/conversations", verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    logger.debug(`💬 [Contacts] Conversations possibles pour ${userId}`);
+    moduleLogger.debug(`💬 [Contacts] Conversations possibles pour ${userId}`);
 
     const user = await User.findById(userId)
       .populate("friends", "fullName email profilePhoto phone isOnline lastSeen")
@@ -300,7 +300,7 @@ router.get("/conversations", verifyToken, async (req, res) => {
       return (a.fullName || '').localeCompare(b.fullName || '');
     });
 
-    logger.info(`✅ [Contacts] ${uniqueConnections.length} conversations possibles (${contactsOnChantilink.length} contacts, ${friends.length} amis)`);
+    moduleLogger.info(`✅ [Contacts] ${uniqueConnections.length} conversations possibles (${contactsOnChantilink.length} contacts, ${friends.length} amis)`);
 
     res.json({
       total: uniqueConnections.length,
@@ -309,7 +309,7 @@ router.get("/conversations", verifyToken, async (req, res) => {
       connections: uniqueConnections
     });
   } catch (err) {
-    logger.error(`❌ [Contacts] Erreur conversations:`, err);
+    moduleLogger.error(`❌ [Contacts] Erreur conversations:`, err);
     res.status(500).json({ 
       message: "Erreur lors de la récupération",
       error: err.message
@@ -325,7 +325,7 @@ router.get("/", verifyToken, async (req, res) => {
     const userId = req.user.id;
     const { onlyChantilink } = req.query;
 
-    logger.debug(`📋 [Contacts] Liste pour user ${userId}`);
+    moduleLogger.debug(`📋 [Contacts] Liste pour user ${userId}`);
 
     const user = await User.findById(userId)
       .populate("contacts.userId", "fullName email profilePhoto phone isOnline lastSeen");
@@ -360,7 +360,7 @@ router.get("/", verifyToken, async (req, res) => {
       lastSync: user.lastContactSync
     });
   } catch (err) {
-    logger.error(`❌ [Contacts] Erreur liste:`, err);
+    moduleLogger.error(`❌ [Contacts] Erreur liste:`, err);
     res.status(500).json({ 
       message: "Erreur lors de la récupération des contacts" 
     });
@@ -393,7 +393,7 @@ router.get("/stats", verifyToken, async (req, res) => {
         : null
     });
   } catch (err) {
-    logger.error(`❌ [Contacts] Erreur stats:`, err);
+    moduleLogger.error(`❌ [Contacts] Erreur stats:`, err);
     res.status(500).json({ message: "Erreur lors de la récupération des stats" });
   }
 });
@@ -415,7 +415,7 @@ router.get("/can-chat/:userId", verifyToken, async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    logger.error(`❌ [Contacts] Erreur can-chat:`, err);
+    moduleLogger.error(`❌ [Contacts] Erreur can-chat:`, err);
     res.status(500).json({ message: "Erreur lors de la vérification" });
   }
 });
@@ -427,7 +427,7 @@ router.get("/search/:phone", verifyToken, async (req, res) => {
   try {
     const { phone } = req.params;
     
-    logger.debug(`🔍 [Contacts] Recherche: ${phone}`);
+    moduleLogger.debug(`🔍 [Contacts] Recherche: ${phone}`);
 
     // Normaliser le numéro
     const normalizedPhone = phone
@@ -457,7 +457,7 @@ router.get("/search/:phone", verifyToken, async (req, res) => {
       }
     });
   } catch (err) {
-    logger.error(`❌ [Contacts] Erreur recherche:`, err);
+    moduleLogger.error(`❌ [Contacts] Erreur recherche:`, err);
     res.status(500).json({ message: "Erreur lors de la recherche" });
   }
 });
@@ -470,7 +470,7 @@ router.delete("/:contactPhone", verifyToken, async (req, res) => {
     const userId = req.user.id;
     const { contactPhone } = req.params;
 
-    logger.info(`🗑️ [Contacts] Suppression: ${contactPhone} par ${userId}`);
+    moduleLogger.info(`🗑️ [Contacts] Suppression: ${contactPhone} par ${userId}`);
 
     const user = await User.findById(userId);
     if (!user) {
@@ -494,14 +494,14 @@ router.delete("/:contactPhone", verifyToken, async (req, res) => {
 
     await user.save();
 
-    logger.info(`✅ [Contacts] Contact supprimé`);
+    moduleLogger.info(`✅ [Contacts] Contact supprimé`);
 
     res.json({
       success: true,
       message: "Contact supprimé avec succès"
     });
   } catch (err) {
-    logger.error(`❌ [Contacts] Erreur suppression:`, err);
+    moduleLogger.error(`❌ [Contacts] Erreur suppression:`, err);
     res.status(500).json({ message: "Erreur lors de la suppression" });
   }
 });
