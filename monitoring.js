@@ -1,18 +1,5 @@
 // backend/monitoring.js
-import pino from "pino";
 import logger from "./config/moduleLogger.js";
-
-// Configuration du logger Pino
-const logger = pino({
-  transport: {
-    target: "pino-pretty",
-    options: {
-      colorize: true,
-      translateTime: "SYS:standard",
-      ignore: "pid,hostname",
-    },
-  },
-});
 
 // Middleware HTTP pour Express
 export const requestStats = (req, res, next) => {
@@ -23,9 +10,6 @@ export const requestStats = (req, res, next) => {
   });
   next();
 };
-
-// Middleware Pino HTTP (optionnel si tu veux loguer automatiquement toutes les requêtes)
-export const httpLogger = pinoHttp({ logger });
 
 // Fonction pour surveiller les erreurs critiques
 export const monitorApp = (app) => {
