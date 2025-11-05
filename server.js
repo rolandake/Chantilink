@@ -8,10 +8,11 @@ import path from "path";
 import { fileURLToPath } from "url";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
-import pino from "pino";
-import pinoHttp from "pino-http";
 import axios from "axios";
 import jwt from "jsonwebtoken";
+
+// Logger centralisé
+import logger, { httpLogger } from "./config/moduleLogger.js";
 
 // Modules internes
 import * as modules from "./modules.js";
@@ -79,23 +80,6 @@ console.log('🔍 Vérification des imports:', {
   "exports",
 ].forEach((dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-});
-
-// ========================================
-// LOGGER Pino
-// ========================================
-const logger = pino({
-  transport: {
-    targets: [
-      { 
-        target: "pino-pretty", 
-        level: "info", 
-        options: { colorize: true, translateTime: "HH:MM:ss" } 
-      },
-      { target: "pino/file", level: "info", options: { destination: "logs/info.log", mkdir: true } },
-      { target: "pino/file", level: "error", options: { destination: "logs/error.log", mkdir: true } },
-    ],
-  },
 });
 
 // ========================================
@@ -177,7 +161,10 @@ app.use(
   })
 );
 
-app.use(pinoHttp({ logger }));
+// ========================================
+// LOGGER MIDDLEWARE
+// ========================================
+app.use(httpLogger);
 app.use(monitoring.requestStats);
 
 // ========================================
