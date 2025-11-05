@@ -1,17 +1,8 @@
 // backend/sockets/socketAuth.js - VERSION CORRIGÉE
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import pino from "pino";
+import logger from "../config/moduleLogger.js";
 
-// ============================
-// ⚙️ Logger configuration
-// ============================
-const logger = pino({
-  transport: {
-    target: "pino-pretty",
-    options: { colorize: true, translateTime: "HH:MM:ss" },
-  },
-});
 
 // ============================
 // ⚡ Middleware Socket.io

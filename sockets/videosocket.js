@@ -1,11 +1,4 @@
-import pino from "pino";
-
-const logger = pino({
-  transport: {
-    target: "pino-pretty",
-    options: { colorize: true, translateTime: "HH:MM:ss" },
-  },
-});
+import logger from "../config/moduleLogger.js";
 
 export const initializeSocket = (io) => {
   const videoNamespace = io.of("/videos");

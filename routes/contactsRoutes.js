@@ -2,16 +2,8 @@
 import express from "express";
 import { verifyToken } from "../middleware/auth.js";
 import User from "../models/User.js";
-import pino from "pino";
+import moduleLogger from "../config/moduleLogger.js";
 
-const router = express.Router();
-
-const logger = pino({
-  transport: {
-    target: "pino-pretty",
-    options: { colorize: true, translateTime: "HH:MM:ss" },
-  },
-});
 
 // ========================================
 // 📞 SYNCHRONISER LES CONTACTS - CORRIGÉ

@@ -1,13 +1,7 @@
 // backend/sockets/visionSocket.js - NAMESPACE /vision POUR BUREAU D'ÉTUDE
 import { aiManager } from "../utils/aiProviderManager.js";
-import pino from "pino";
+import logger from "../config/moduleLogger.js";
 
-const logger = pino({
-  transport: {
-    target: "pino-pretty",
-    options: { colorize: true, translateTime: "HH:MM:ss" },
-  },
-});
 
 // Historiques de conversation par room
 const projectHistories = new Map();

@@ -4,14 +4,9 @@ import { initializeSocket } from "./videosocket.js";
 import { registerEngineeringSocket } from "./engineeringSocket.js";
 import { registerStorySocket } from "./storySocket.js";
 import { registerMessageSocket } from "./messageSocket.js";
-import pino from "pino";
+import logger from "../config/moduleLogger.js";
 
-const logger = pino({ 
-  transport: {
-    target: "pino-pretty",
-    options: { colorize: true, translateTime: "HH:MM:ss" }
-  }
-});
+
 
 export function handleSocketConnection(io) {
   // ✅ PAS DE MIDDLEWARE GLOBAL ICI
